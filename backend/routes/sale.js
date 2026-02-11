@@ -7,6 +7,7 @@ const router = express.Router();
 
 // POST SALE
 router.post("/sale", async (req, res) => {
+  const ownerId = req.user.uid;
   const {
     itemName,
     quantity,
@@ -43,7 +44,7 @@ router.post("/sale", async (req, res) => {
   }
 
   try {
-    const stockDoc = await Stock.findOne({ itemName });
+    const stockDoc = await Stock.findOne({ itemName, ownerId });
 
     if (!stockDoc) {
       return res.status(400).json({ message: "Not enough stock" });
@@ -57,7 +58,7 @@ router.post("/sale", async (req, res) => {
 
     const saleUnit = stockDoc.unit || normalizedUnit || "pcs";
     const stock = await Stock.findOneAndUpdate(
-      { _id: stockDoc._id, quantity: { $gte: qty } },
+      { _id: stockDoc._id, ownerId, quantity: { $gte: qty } },
       { $inc: { quantity: -qty }, $set: { unit: saleUnit } },
       { new: true }
     );
@@ -69,6 +70,7 @@ router.post("/sale", async (req, res) => {
     let sale;
     try {
       sale = await Sale.create({
+        ownerId,
         itemName,
         quantity: qty,
         price: unitPrice,
@@ -100,7 +102,7 @@ router.post("/sale", async (req, res) => {
 // GET SALES
 router.get("/sale", async (req, res) => {
   try {
-    const sales = await Sale.find().sort({ saleDate: -1, date: -1 });
+    const sales = await Sale.find({ ownerId: req.user.uid }).sort({ saleDate: -1, date: -1 });
     res.json(sales);
   } catch (err) {
     res.status(500).json({ message: "Failed to load sales" });
@@ -110,20 +112,21 @@ router.get("/sale", async (req, res) => {
 // 🔥 DELETE SALE + RESTORE STOCK
 router.delete("/sale/:id", async (req, res) => {
   const { id } = req.params;
+  const ownerId = req.user.uid;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ message: "Invalid sale id" });
   }
 
   try {
-    const sale = await Sale.findById(id);
+    const sale = await Sale.findOne({ _id: id, ownerId });
 
     if (!sale) {
       return res.status(404).json({ message: "Sale not found" });
     }
 
     const stock = await Stock.findOneAndUpdate(
-      { itemName: sale.itemName },
+      { itemName: sale.itemName, ownerId },
       {
         $inc: { quantity: sale.quantity },
         $setOnInsert: { price: sale.price, unit: sale.unit || "pcs" },
@@ -132,7 +135,7 @@ router.delete("/sale/:id", async (req, res) => {
     );
 
     try {
-      await Sale.deleteOne({ _id: sale._id });
+      await Sale.deleteOne({ _id: sale._id, ownerId });
     } catch (err) {
       await Stock.updateOne({ _id: stock._id }, { $inc: { quantity: -sale.quantity } });
       throw err;

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from "react";
 import BackButton from "./BackButton";
 import ProfileMenu from "./ProfileMenu";
-
-const API = process.env.REACT_APP_API_URL || "/api";
+import { apiFetch } from "../utils/api";
 
 const initialDate = new Date().toISOString().slice(0, 10);
 const unitOptions = [
@@ -31,7 +30,7 @@ const PurchaseEntry = () => {
 
   const loadPurchases = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/purchase`);
+      const res = await apiFetch("/purchase");
       if (!res.ok) {
         throw new Error("Failed to load purchases");
       }
@@ -52,9 +51,8 @@ const PurchaseEntry = () => {
     }
 
     try {
-      const res = await fetch(`${API}/purchase`, {
+      const res = await apiFetch("/purchase", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itemName: form.itemName,
           price: Number(form.itemPrice),
@@ -99,7 +97,7 @@ const PurchaseEntry = () => {
 
   const deletePurchase = async (id) => {
     try {
-      const res = await fetch(`${API}/purchase/${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/purchase/${id}`, { method: "DELETE" });
       let data = {};
       try {
         data = await res.json();

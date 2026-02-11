@@ -1,8 +1,8 @@
 import React, { useEffect, useState, useCallback } from "react";
 import BackButton from "./BackButton";
 import ProfileMenu from "./ProfileMenu";
+import { apiFetch } from "../utils/api";
 
-const API = process.env.REACT_APP_API_URL || "/api";
 const initialDate = new Date().toISOString().slice(0, 10);
 const unitOptions = [
   { value: "pcs", label: "Pieces (pcs)" },
@@ -30,7 +30,7 @@ const SaleManagement = () => {
 
   const loadStock = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/stock`);
+      const res = await apiFetch("/stock");
       if (!res.ok) {
         throw new Error("Failed to load stock");
       }
@@ -43,7 +43,7 @@ const SaleManagement = () => {
 
   const loadSales = useCallback(async () => {
     try {
-      const res = await fetch(`${API}/sale`);
+      const res = await apiFetch("/sale");
       if (!res.ok) {
         throw new Error("Failed to load sales");
       }
@@ -109,9 +109,8 @@ const SaleManagement = () => {
     if (!cart.length) return alert("Cart empty");
 
     for (let item of cart) {
-      const res = await fetch(`${API}/sale`, {
+      const res = await apiFetch("/sale", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           itemName: item.name,
           price: item.price,
@@ -250,7 +249,7 @@ const SaleManagement = () => {
 
   const deleteSale = async (id) => {
     try {
-      const res = await fetch(`${API}/sale/${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/sale/${id}`, { method: "DELETE" });
       let data = {};
       try {
         data = await res.json();

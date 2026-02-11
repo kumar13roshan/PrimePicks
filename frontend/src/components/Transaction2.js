@@ -2,8 +2,7 @@ import React, { useEffect, useState } from "react";
 import gpayQR from "../assets/gpay.png";
 import BackButton from "./BackButton";
 import ProfileMenu from "./ProfileMenu";
-
-const API = process.env.REACT_APP_API_URL || "/api";
+import { apiFetch } from "../utils/api";
 
 const Transactions = () => {
   const [transactions, setTransactions] = useState([]);
@@ -15,7 +14,7 @@ const Transactions = () => {
       setLoading(true);
       setErrorMessage("");
       try {
-        const res = await fetch(`${API}/sale`);
+        const res = await apiFetch("/sale");
         if (!res.ok) {
           throw new Error("Failed to load transactions");
         }

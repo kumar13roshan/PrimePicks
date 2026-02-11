@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import BackButton from "./BackButton";
 import ProfileMenu from "./ProfileMenu";
-
-const API = process.env.REACT_APP_API_URL || "/api";
+import { apiFetch } from "../utils/api";
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -48,9 +47,9 @@ const Dashboard = () => {
       setErrorMessage("");
       try {
         const [salesRes, purchasesRes, stockRes] = await Promise.all([
-          fetch(`${API}/sale`),
-          fetch(`${API}/purchase`),
-          fetch(`${API}/stock`),
+          apiFetch("/sale"),
+          apiFetch("/purchase"),
+          apiFetch("/stock"),
         ]);
 
         if (!salesRes.ok || !purchasesRes.ok || !stockRes.ok) {

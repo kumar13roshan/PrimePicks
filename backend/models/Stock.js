@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 
 const stockSchema = new mongoose.Schema({
+  ownerId: { type: String, required: true, index: true },
   itemName: { type: String, required: true, trim: true },
   quantity: { type: Number, required: true, min: 0 },
   price: { type: Number, required: true, min: 0 },

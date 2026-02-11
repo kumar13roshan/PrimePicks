@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import BackButton from "./BackButton";
 import ProfileMenu from "./ProfileMenu";
-
-const API = process.env.REACT_APP_API_URL || "/api";
+import { apiFetch } from "../utils/api";
 
 const Suppliers = () => {
   const [purchases, setPurchases] = useState([]);
@@ -15,7 +14,7 @@ const Suppliers = () => {
       setLoading(true);
       setErrorMessage("");
       try {
-        const res = await fetch(`${API}/purchase`);
+        const res = await apiFetch("/purchase");
         if (!res.ok) {
           throw new Error("Failed to load purchases");
         }

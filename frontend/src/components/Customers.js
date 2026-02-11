@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import BackButton from "./BackButton";
 import ProfileMenu from "./ProfileMenu";
-
-const API = process.env.REACT_APP_API_URL || "/api";
+import { apiFetch } from "../utils/api";
 
 const Customers = () => {
   const [sales, setSales] = useState([]);
@@ -15,7 +14,7 @@ const Customers = () => {
       setLoading(true);
       setErrorMessage("");
       try {
-        const res = await fetch(`${API}/sale`);
+        const res = await apiFetch("/sale");
         if (!res.ok) {
           throw new Error("Failed to load sales");
         }

@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import BackButton from "./BackButton";
 import ProfileMenu from "./ProfileMenu";
-
-const API = process.env.REACT_APP_API_URL || "/api";
+import { apiFetch } from "../utils/api";
 
 const StockApp = () => {
   const [stock, setStock] = useState([]);
@@ -17,9 +16,9 @@ const StockApp = () => {
     setErrorMessage("");
     try {
       const [stockRes, purchaseRes, saleRes] = await Promise.all([
-        fetch(`${API}/stock`),
-        fetch(`${API}/purchase`),
-        fetch(`${API}/sale`),
+        apiFetch("/stock"),
+        apiFetch("/purchase"),
+        apiFetch("/sale"),
       ]);
 
       if (!stockRes.ok || !purchaseRes.ok || !saleRes.ok) {
@@ -101,7 +100,7 @@ const StockApp = () => {
 
     setDeletingId(id);
     try {
-      const res = await fetch(`${API}/stock/${id}`, { method: "DELETE" });
+      const res = await apiFetch(`/stock/${id}`, { method: "DELETE" });
       const data = await res.json();
       if (!res.ok) {
         return alert(data.message || "Failed to delete stock item");

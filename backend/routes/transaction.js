@@ -12,7 +12,7 @@ router.post("/transaction", async (req, res) => {
   }
 
   try {
-    const transaction = await Transaction.create({ type, amount: amt });
+    const transaction = await Transaction.create({ ownerId: req.user.uid, type, amount: amt });
     res.json({ message: "Transaction saved", transaction });
   } catch (err) {
     res.status(500).json({ message: "Failed to save transaction" });
@@ -21,7 +21,7 @@ router.post("/transaction", async (req, res) => {
 
 router.get("/transaction", async (req, res) => {
   try {
-    const transactions = await Transaction.find().sort({ date: -1 });
+    const transactions = await Transaction.find({ ownerId: req.user.uid }).sort({ date: -1 });
     res.json(transactions);
   } catch (err) {
     res.status(500).json({ message: "Failed to load transactions" });

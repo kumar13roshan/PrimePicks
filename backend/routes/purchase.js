@@ -8,7 +8,7 @@ const router = express.Router();
 // GET ALL PURCHASES
 router.get("/purchase", async (req, res) => {
   try {
-    const purchases = await Purchase.find().sort({ purchaseDate: -1, date: -1 });
+    const purchases = await Purchase.find({ ownerId: req.user.uid }).sort({ purchaseDate: -1, date: -1 });
     res.json(purchases);
   } catch (err) {
     res.status(500).json({ message: "Failed to load purchases" });
@@ -17,6 +17,7 @@ router.get("/purchase", async (req, res) => {
 
 // ADD PURCHASE
 router.post("/purchase", async (req, res) => {
+  const ownerId = req.user.uid;
   const {
     itemName,
     quantity,
@@ -53,7 +54,7 @@ router.post("/purchase", async (req, res) => {
   }
 
   try {
-    const existingStock = await Stock.findOne({ itemName });
+    const existingStock = await Stock.findOne({ itemName, ownerId });
     if (existingStock?.unit && existingStock.unit !== normalizedUnit) {
       return res.status(400).json({
         message: `Unit mismatch. ${itemName} is tracked in ${existingStock.unit}.`,
@@ -61,6 +62,7 @@ router.post("/purchase", async (req, res) => {
     }
 
     const purchase = await Purchase.create({
+      ownerId,
       itemName,
       quantity: qty,
       price: unitPrice,
@@ -78,7 +80,7 @@ router.post("/purchase", async (req, res) => {
     let stock;
     try {
       stock = await Stock.findOneAndUpdate(
-        { itemName },
+        { itemName, ownerId },
         { $inc: { quantity: qty }, $set: { price: unitPrice, unit: normalizedUnit } },
         { new: true, upsert: true }
       );
@@ -100,26 +102,27 @@ router.post("/purchase", async (req, res) => {
 // DELETE PURCHASE (with stock rollback)
 router.delete("/purchase/:id", async (req, res) => {
   const { id } = req.params;
+  const ownerId = req.user.uid;
 
   if (!mongoose.Types.ObjectId.isValid(id)) {
     return res.status(400).json({ message: "Invalid purchase id" });
   }
 
   try {
-    const purchase = await Purchase.findById(id);
+    const purchase = await Purchase.findOne({ _id: id, ownerId });
 
     if (!purchase) {
       return res.status(404).json({ message: "Purchase not found" });
     }
 
-    const stock = await Stock.findOne({ itemName: purchase.itemName });
+    const stock = await Stock.findOne({ itemName: purchase.itemName, ownerId });
     if (stock) {
       stock.quantity = Math.max(0, stock.quantity - purchase.quantity);
       await stock.save();
     }
 
     try {
-      await Purchase.deleteOne({ _id: purchase._id });
+      await Purchase.deleteOne({ _id: purchase._id, ownerId });
     } catch (err) {
       if (stock) {
         stock.quantity += purchase.quantity;

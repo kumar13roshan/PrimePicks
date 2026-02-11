@@ -3,8 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
 import ProfileMenu from "./ProfileMenu";
-
-const API = process.env.REACT_APP_API_URL || "/api";
+import { apiFetch } from "../utils/api";
 
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
@@ -75,7 +74,7 @@ const AdminDetails = () => {
 
       try {
         controller = new AbortController();
-        const res = await fetch(`${API}/admin?email=${encodeURIComponent(userEmail)}`, {
+        const res = await apiFetch(`/admin?email=${encodeURIComponent(userEmail)}`, {
           signal: controller.signal,
         });
         if (res.ok) {
@@ -134,9 +133,8 @@ const AdminDetails = () => {
     setSaving(true);
 
     try {
-      const res = await fetch(`${API}/admin`, {
+      const res = await apiFetch("/admin", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
           name: form.name.trim(),
