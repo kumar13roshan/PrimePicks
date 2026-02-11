@@ -2,7 +2,7 @@
   "name": "primepicks",
   "version": "1.0.0",
   "private": true,
-  "proxy": "https://primepicks-backend-efxe.onrender.com",
+  "proxy": "https://primepicks-backend-72gw.onrender.com",
   "dependencies": {
     "autoprefixer": "^10.4.21",
     "axios": "^1.8.4",
