@@ -36,8 +36,12 @@ router.post("/purchase", async (req, res) => {
   const qty = Number(quantity);
   const unitPrice = Number(price);
   const normalizedUnit = typeof unit === "string" ? unit.trim() : "";
+  const normalizedSupplierName = String(supplierName || "").trim();
+  const normalizedSupplierPhone = String(supplierPhone || "").replace(/\D/g, "");
+  const normalizedSupplierEmail = String(supplierEmail || "").trim().toLowerCase();
   const parsedDate = new Date(purchaseDate);
   const dateIsValid = purchaseDate && !Number.isNaN(parsedDate.getTime());
+  const emailIsValid = !normalizedSupplierEmail || normalizedSupplierEmail.includes("@");
 
   if (
     !itemName ||
@@ -46,11 +50,14 @@ router.post("/purchase", async (req, res) => {
     !Number.isFinite(unitPrice) ||
     unitPrice < 0 ||
     !normalizedUnit ||
-    !supplierName ||
-    !supplierPhone ||
+    !normalizedSupplierName ||
+    normalizedSupplierPhone.length !== 10 ||
     !dateIsValid
   ) {
     return res.status(400).json({ message: "Invalid purchase data" });
+  }
+  if (!emailIsValid) {
+    return res.status(400).json({ message: "Invalid supplier email" });
   }
 
   try {
@@ -67,10 +74,10 @@ router.post("/purchase", async (req, res) => {
       quantity: qty,
       price: unitPrice,
       unit: normalizedUnit,
-      supplierName,
-      supplierPhone,
+      supplierName: normalizedSupplierName,
+      supplierPhone: normalizedSupplierPhone,
       supplierGstNumber,
-      supplierEmail,
+      supplierEmail: normalizedSupplierEmail,
       supplierAddress,
       invoiceNumber,
       purchaseDate: parsedDate,

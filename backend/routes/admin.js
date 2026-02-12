@@ -29,6 +29,13 @@ router.get("/admin", async (req, res) => {
   }
 });
 
+router.get("/me", (req, res) => {
+  return res.json({
+    uid: req.user?.uid || "",
+    email: req.user?.email || "",
+  });
+});
+
 router.post("/admin", async (req, res) => {
   const { email, name, shopName, gstNumber, address, phone } = req.body;
 

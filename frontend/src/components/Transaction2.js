@@ -8,6 +8,10 @@ const Transactions = () => {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
+  const [openingBalances, setOpeningBalances] = useState({ cash: 0, online: 0 });
+  const [openingForm, setOpeningForm] = useState({ cash: "0", online: "0" });
+  const [openingSaving, setOpeningSaving] = useState(false);
+  const [openingError, setOpeningError] = useState("");
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -28,6 +32,27 @@ const Transactions = () => {
     };
 
     fetchTransactions();
+  }, []);
+
+  useEffect(() => {
+    const fetchOpeningBalances = async () => {
+      setOpeningError("");
+      try {
+        const res = await apiFetch("/transaction/opening");
+        if (!res.ok) {
+          throw new Error("Failed to load opening balances");
+        }
+        const data = await res.json();
+        const cash = Number(data.cash || 0);
+        const online = Number(data.online || 0);
+        setOpeningBalances({ cash, online });
+        setOpeningForm({ cash: String(cash), online: String(online) });
+      } catch (err) {
+        setOpeningError("Unable to load opening balances.");
+      }
+    };
+
+    fetchOpeningBalances();
   }, []);
 
   const cashTransactions = transactions.filter(txn => txn.paymentType === "Cash");
@@ -67,6 +92,40 @@ const Transactions = () => {
   };
 
   const getTotal = (txn) => Number(txn.price || 0) * Number(txn.quantity || 0);
+  const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString()}`;
+
+  const cashSalesTotal = cashTransactions.reduce((sum, txn) => sum + getTotal(txn), 0);
+  const onlineSalesTotal = onlineTransactions.reduce((sum, txn) => sum + getTotal(txn), 0);
+  const cashTotal = Number(openingBalances.cash || 0) + cashSalesTotal;
+  const onlineTotal = Number(openingBalances.online || 0) + onlineSalesTotal;
+
+  const saveOpeningBalances = async () => {
+    const cash = Number(openingForm.cash);
+    const online = Number(openingForm.online);
+
+    if (!Number.isFinite(cash) || cash < 0 || !Number.isFinite(online) || online < 0) {
+      return alert("Opening balances must be 0 or more.");
+    }
+
+    setOpeningSaving(true);
+    setOpeningError("");
+    try {
+      const res = await apiFetch("/transaction/opening", {
+        method: "POST",
+        body: JSON.stringify({ cash, online }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return alert(data.message || "Failed to save opening balances");
+      }
+      setOpeningBalances({ cash, online });
+      setOpeningForm({ cash: String(cash), online: String(online) });
+    } catch (err) {
+      alert("Unable to reach the backend. Check that the server is running.");
+    } finally {
+      setOpeningSaving(false);
+    }
+  };
 
   return (
     <div className="page full">
@@ -86,7 +145,87 @@ const Transactions = () => {
       <div className="grid two">
         <section className="card">
           <div className="card-header">
-            <h2>Cash Transactions</h2>
+            <div>
+              <h2>Opening Balances</h2>
+              <p className="subtitle">Set the starting cash and online balances.</p>
+            </div>
+            <span className="badge">Start-up</span>
+          </div>
+          <div className="row">
+            <div className="field">
+              <span>Cash Opening</span>
+              <input
+                type="number"
+                className="input"
+                value={openingForm.cash}
+                onChange={(e) => setOpeningForm({ ...openingForm, cash: e.target.value })}
+              />
+            </div>
+            <div className="field">
+              <span>Online Opening</span>
+              <input
+                type="number"
+                className="input"
+                value={openingForm.online}
+                onChange={(e) => setOpeningForm({ ...openingForm, online: e.target.value })}
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn primary"
+            onClick={saveOpeningBalances}
+            disabled={openingSaving}
+          >
+            {openingSaving ? "Saving..." : "Save Opening Balances"}
+          </button>
+          {openingError && <p className="subtitle">{openingError}</p>}
+        </section>
+
+        <section className="card">
+          <div className="card-header">
+            <div>
+              <h2>Totals</h2>
+              <p className="subtitle">Sales totals plus opening balances.</p>
+            </div>
+            <span className="badge accent">Updated</span>
+          </div>
+          <div className="stack sm">
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <span>Cash Sales</span>
+              <strong>{formatCurrency(cashSalesTotal)}</strong>
+            </div>
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <span>Cash Opening</span>
+              <strong>{formatCurrency(openingBalances.cash)}</strong>
+            </div>
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <span>Total Cash</span>
+              <strong>{formatCurrency(cashTotal)}</strong>
+            </div>
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <span>Online Sales</span>
+              <strong>{formatCurrency(onlineSalesTotal)}</strong>
+            </div>
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <span>Online Opening</span>
+              <strong>{formatCurrency(openingBalances.online)}</strong>
+            </div>
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <span>Total Online</span>
+              <strong>{formatCurrency(onlineTotal)}</strong>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <div className="grid two">
+        <section className="card">
+          <div className="card-header">
+            <div>
+              <h2>Cash Transactions</h2>
+              <p className="subtitle">Total: {formatCurrency(cashTotal)}</p>
+            </div>
             <span className="badge">{cashTransactions.length}</span>
           </div>
           {loading ? (
@@ -113,7 +252,10 @@ const Transactions = () => {
 
         <section className="card clickable" onClick={handleOnlineTransactionsClick}>
           <div className="card-header">
-            <h2>Online Transactions</h2>
+            <div>
+              <h2>Online Transactions</h2>
+              <p className="subtitle">Total: {formatCurrency(onlineTotal)}</p>
+            </div>
             <span className="badge accent">{onlineTransactions.length}</span>
           </div>
           {loading ? (

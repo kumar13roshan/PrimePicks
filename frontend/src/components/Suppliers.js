@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import BackButton from "./BackButton";
 import ProfileMenu from "./ProfileMenu";
 import { apiFetch } from "../utils/api";
+import { normalizeEmail, normalizeNameKey, normalizePhone } from "../utils/validation";
 
 const Suppliers = () => {
   const [purchases, setPurchases] = useState([]);
@@ -36,7 +37,9 @@ const Suppliers = () => {
       const name = purchase.supplierName || "Unknown Supplier";
       const phone = purchase.supplierPhone || "";
       const email = purchase.supplierEmail || "";
-      const key = [name, phone, email].filter(Boolean).join("|") || purchase._id;
+      const key = [normalizeNameKey(name), normalizePhone(phone), normalizeEmail(email)]
+        .filter(Boolean)
+        .join("|") || purchase._id;
 
       const amount = Number(purchase.price || 0) * Number(purchase.quantity || 0);
       const dateValue = purchase.purchaseDate || purchase.date;
@@ -44,8 +47,8 @@ const Suppliers = () => {
       if (!map.has(key)) {
         map.set(key, {
           name,
-          phone,
-          email,
+          phone: normalizePhone(phone) || phone,
+          email: normalizeEmail(email) || email,
           address: purchase.supplierAddress || "",
           totalAmount: 0,
           totalQuantity: 0,

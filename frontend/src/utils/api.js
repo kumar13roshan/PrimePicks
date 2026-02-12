@@ -1,13 +1,25 @@
+import { onAuthStateChanged } from "firebase/auth";
 import { auth } from "../firebase";
 
 const API_BASE = process.env.REACT_APP_API_URL || "/api";
 
+const waitForAuth = () =>
+  new Promise((resolve) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      unsubscribe();
+      resolve(user);
+    });
+  });
+
 const getAuthToken = async () => {
-  const user = auth.currentUser;
+  let user = auth.currentUser;
+  if (!user) {
+    user = await waitForAuth();
+  }
   if (!user) {
     throw new Error("Not authenticated");
   }
-  return user.getIdToken();
+  return user.getIdToken(true);
 };
 
 export const apiFetch = async (path, options = {}) => {

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import BackButton from "./BackButton";
 import ProfileMenu from "./ProfileMenu";
 import { apiFetch } from "../utils/api";
+import { hasAtSymbol, isValidPhone, normalizeEmail, normalizePhone } from "../utils/validation";
 
 const initialDate = new Date().toISOString().slice(0, 10);
 const unitOptions = [
@@ -46,8 +47,20 @@ const PurchaseEntry = () => {
   }, [loadPurchases]);
 
   const handleAddPurchase = async () => {
-    if (!form.itemName || !form.itemPrice || !form.quantity || !form.unit || !form.supplierName || !form.supplierPhone || !form.purchaseDate) {
+    const trimmedSupplierName = String(form.supplierName || "").trim();
+    const trimmedSupplierEmail = String(form.supplierEmail || "").trim();
+    const normalizedSupplierPhone = normalizePhone(form.supplierPhone);
+
+    if (!form.itemName || !form.itemPrice || !form.quantity || !form.unit || !trimmedSupplierName || !normalizedSupplierPhone || !form.purchaseDate) {
       return alert("Fill all required fields");
+    }
+
+    if (!isValidPhone(form.supplierPhone)) {
+      return alert("Enter a 10 digit mobile number.");
+    }
+
+    if (trimmedSupplierEmail && !hasAtSymbol(trimmedSupplierEmail)) {
+      return alert("Email must contain @.");
     }
 
     try {
@@ -58,10 +71,10 @@ const PurchaseEntry = () => {
           price: Number(form.itemPrice),
           quantity: Number(form.quantity),
           unit: form.unit,
-          supplierName: form.supplierName,
-          supplierPhone: form.supplierPhone,
+          supplierName: trimmedSupplierName,
+          supplierPhone: normalizedSupplierPhone,
           supplierGstNumber: form.supplierGstNumber,
-          supplierEmail: form.supplierEmail,
+          supplierEmail: trimmedSupplierEmail ? normalizeEmail(trimmedSupplierEmail) : "",
           supplierAddress: form.supplierAddress,
           invoiceNumber: form.invoiceNumber,
           purchaseDate: form.purchaseDate,
@@ -217,7 +230,9 @@ const PurchaseEntry = () => {
             />
             <div className="row">
               <input
-                placeholder="Supplier Phone *"
+                placeholder="Supplier Phone * (10 digits)"
+                type="tel"
+                inputMode="numeric"
                 value={form.supplierPhone}
                 onChange={(e) => setForm({ ...form, supplierPhone: e.target.value })}
                 className="input"

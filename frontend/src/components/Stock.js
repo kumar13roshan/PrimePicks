@@ -3,6 +3,12 @@ import BackButton from "./BackButton";
 import ProfileMenu from "./ProfileMenu";
 import { apiFetch } from "../utils/api";
 
+const unitOptions = [
+  { value: "pcs", label: "Pieces (pcs)" },
+  { value: "L", label: "Liters (L)" },
+  { value: "kg", label: "Kilograms (kg)" },
+];
+
 const StockApp = () => {
   const [stock, setStock] = useState([]);
   const [purchases, setPurchases] = useState([]);
@@ -10,6 +16,15 @@ const StockApp = () => {
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
   const [deletingId, setDeletingId] = useState("");
+  const [openingItemKey, setOpeningItemKey] = useState("");
+  const [openingForm, setOpeningForm] = useState({
+    itemName: "",
+    openingQuantity: "",
+    unit: "pcs",
+    price: "",
+  });
+  const [openingSaving, setOpeningSaving] = useState(false);
+  const [openingMessage, setOpeningMessage] = useState("");
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -50,6 +65,10 @@ const StockApp = () => {
 
   const lowStock = stock.filter((item) => item.quantity > 0 && item.quantity <= 5);
   const outOfStock = stock.filter((item) => item.quantity === 0);
+  const totalUnits = useMemo(
+    () => stock.reduce((sum, item) => sum + Number(item.quantity || 0), 0),
+    [stock]
+  );
 
   const reorderList = useMemo(() => {
     return [...outOfStock, ...lowStock]
@@ -86,6 +105,94 @@ const StockApp = () => {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return value;
     return date.toLocaleString();
+  };
+
+  const handleOpeningSelect = (value) => {
+    setOpeningMessage("");
+    setOpeningItemKey(value);
+
+    if (value === "__new__") {
+      setOpeningForm({
+        itemName: "",
+        openingQuantity: "",
+        unit: "pcs",
+        price: "",
+      });
+      return;
+    }
+
+    const matched = stock.find((item) => item.itemName === value);
+    if (matched) {
+      setOpeningForm({
+        itemName: matched.itemName,
+        openingQuantity: String(matched.openingQuantity ?? 0),
+        unit: matched.unit || "pcs",
+        price: matched.price ?? "",
+      });
+      return;
+    }
+
+    setOpeningForm({
+      itemName: value || "",
+      openingQuantity: "",
+      unit: "pcs",
+      price: "",
+    });
+  };
+
+  const saveOpeningStock = async () => {
+    const name = String(openingForm.itemName || "").trim();
+    const openingQty = Number(openingForm.openingQuantity);
+
+    if (!name) {
+      return alert("Enter an item name.");
+    }
+    if (!Number.isFinite(openingQty) || openingQty < 0) {
+      return alert("Opening quantity must be 0 or more.");
+    }
+
+    const payload = {
+      itemName: name,
+      openingQuantity: openingQty,
+      unit: openingForm.unit || "pcs",
+    };
+
+    if (openingForm.price !== "") {
+      const unitPrice = Number(openingForm.price);
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+        return alert("Price must be 0 or more.");
+      }
+      payload.price = unitPrice;
+    } else if (openingItemKey === "__new__") {
+      return alert("Price is required for new items.");
+    }
+
+    setOpeningSaving(true);
+    setOpeningMessage("");
+    try {
+      const res = await apiFetch("/stock/opening", {
+        method: "POST",
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return alert(data.message || "Failed to save opening stock");
+      }
+      await fetchAll();
+      setOpeningMessage("Opening stock saved.");
+      if (openingItemKey === "__new__") {
+        setOpeningForm({
+          itemName: "",
+          openingQuantity: "",
+          unit: "pcs",
+          price: "",
+        });
+      }
+    } catch (err) {
+      alert("Unable to reach the backend. Check that the server is running.");
+    } finally {
+      setOpeningSaving(false);
+    }
   };
 
   const deleteStockItem = async (item) => {
@@ -130,7 +237,10 @@ const StockApp = () => {
           <h1>Stock Manager</h1>
           <p className="subtitle">Monitor live quantities and restock before you run out.</p>
         </div>
-        <span className="badge accent">{stock.length} products</span>
+        <div className="row">
+          <span className="badge accent">{stock.length} products</span>
+          <span className="badge">Total units: {totalUnits}</span>
+        </div>
       </div>
 
       <div className="grid two">
@@ -148,6 +258,93 @@ const StockApp = () => {
             <p className="subtitle">
               Items below 5 units are flagged for reorder. Out of stock items need immediate action.
             </p>
+          </div>
+
+          <div className="card stack">
+            <div className="card-header">
+              <div>
+                <h2>Opening Stock</h2>
+                <p className="subtitle">Add starting quantities for items already on hand.</p>
+              </div>
+              <span className="badge">Start-up</span>
+            </div>
+            <div className="stack">
+              <div className="field">
+                <span>Item</span>
+                <select
+                  className="select"
+                  value={openingItemKey}
+                  onChange={(e) => handleOpeningSelect(e.target.value)}
+                >
+                  <option value="">Select item</option>
+                  {stock.map((item) => (
+                    <option key={item._id || item.itemName} value={item.itemName}>
+                      {item.itemName}
+                    </option>
+                  ))}
+                  <option value="__new__">+ New item</option>
+                </select>
+              </div>
+
+              {openingItemKey === "__new__" && (
+                <input
+                  placeholder="New Item Name"
+                  value={openingForm.itemName}
+                  onChange={(e) => setOpeningForm({ ...openingForm, itemName: e.target.value })}
+                  className="input"
+                />
+              )}
+
+              <div className="row">
+                <input
+                  placeholder="Opening Quantity"
+                  type="number"
+                  value={openingForm.openingQuantity}
+                  onChange={(e) => setOpeningForm({ ...openingForm, openingQuantity: e.target.value })}
+                  className="input"
+                />
+                {openingItemKey === "__new__" ? (
+                  <select
+                    value={openingForm.unit}
+                    onChange={(e) => setOpeningForm({ ...openingForm, unit: e.target.value })}
+                    className="select"
+                  >
+                    {unitOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    value={openingForm.unit}
+                    readOnly
+                    className="input"
+                    placeholder="Unit"
+                  />
+                )}
+              </div>
+
+              <input
+                placeholder="Price per unit"
+                type="number"
+                value={openingForm.price}
+                onChange={(e) => setOpeningForm({ ...openingForm, price: e.target.value })}
+                className="input"
+              />
+
+              <button
+                type="button"
+                className="btn primary"
+                onClick={saveOpeningStock}
+                disabled={openingSaving}
+              >
+                {openingSaving ? "Saving..." : "Save Opening Stock"}
+              </button>
+
+              {openingMessage && <p className="subtitle">{openingMessage}</p>}
+            </div>
           </div>
 
           <div className="card stack">
@@ -237,13 +434,20 @@ const StockApp = () => {
                     return (
                       <tr key={rowId}>
                         <td>{item.itemName}</td>
-                        <td
-                          style={{
-                            color: item.quantity <= 5 ? 'var(--danger)' : 'var(--good)',
-                            fontWeight: 700
-                          }}
-                        >
-                          {item.quantity === 0 ? 'Out of stock' : `${item.quantity} ${unitLabel}`}
+                        <td>
+                          <div
+                            style={{
+                              color: item.quantity <= 5 ? 'var(--danger)' : 'var(--good)',
+                              fontWeight: 700,
+                            }}
+                          >
+                            {item.quantity === 0 ? 'Out of stock' : `${item.quantity} ${unitLabel}`}
+                          </div>
+                          {Number(item.openingQuantity) > 0 && (
+                            <div className="subtitle">
+                              Opening: {item.openingQuantity} {unitLabel}
+                            </div>
+                          )}
                         </td>
                         <td>
                           <button

@@ -13,6 +13,71 @@ router.get("/stock", async (req, res) => {
   }
 });
 
+router.post("/stock/opening", async (req, res) => {
+  const ownerId = req.user.uid;
+  const name = String(req.body?.itemName || "").trim();
+  const openingQty = Number(req.body?.openingQuantity);
+  const unitPrice = req.body?.price === undefined ? NaN : Number(req.body?.price);
+  const normalizedUnit = typeof req.body?.unit === "string" ? req.body.unit.trim() : "";
+
+  if (!name || !Number.isFinite(openingQty) || openingQty < 0) {
+    return res.status(400).json({ message: "Invalid opening stock data" });
+  }
+
+  try {
+    const existing = await Stock.findOne({ ownerId, itemName: name });
+
+    if (!existing) {
+      if (!Number.isFinite(unitPrice) || unitPrice < 0) {
+        return res.status(400).json({ message: "Price is required for new items" });
+      }
+      const stock = await Stock.create({
+        ownerId,
+        itemName: name,
+        quantity: openingQty,
+        openingQuantity: openingQty,
+        price: unitPrice,
+        unit: normalizedUnit || "pcs",
+      });
+      return res.json({ message: "Opening stock created", stock });
+    }
+
+    if (normalizedUnit && existing.unit && existing.unit !== normalizedUnit) {
+      return res.status(400).json({
+        message: `Unit mismatch. ${name} is tracked in ${existing.unit}.`,
+      });
+    }
+
+    const currentOpening = Number(existing.openingQuantity || 0);
+    const delta = openingQty - currentOpening;
+    const updatedQuantity = Number(existing.quantity || 0) + delta;
+
+    if (updatedQuantity < 0) {
+      return res.status(400).json({
+        message: "Opening stock cannot be reduced below sold quantity.",
+      });
+    }
+
+    const updates = { openingQuantity: openingQty };
+    if (Number.isFinite(unitPrice) && unitPrice >= 0) {
+      updates.price = unitPrice;
+    }
+    if (normalizedUnit) {
+      updates.unit = normalizedUnit;
+    }
+
+    const stock = await Stock.findOneAndUpdate(
+      { _id: existing._id, ownerId },
+      { $inc: { quantity: delta }, $set: updates },
+      { new: true }
+    );
+
+    return res.json({ message: "Opening stock updated", stock });
+  } catch (err) {
+    return res.status(500).json({ message: "Failed to save opening stock" });
+  }
+});
+
 router.delete("/stock/:id", async (req, res) => {
   try {
     const { id } = req.params;

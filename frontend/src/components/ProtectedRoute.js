@@ -5,6 +5,7 @@ import { auth } from "../firebase";
 
 const ProtectedRoute = ({ children }) => {
   const [status, setStatus] = useState("loading");
+  const [uid, setUid] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -13,10 +14,12 @@ const ProtectedRoute = ({ children }) => {
 
       if (!user) {
         setStatus("guest");
+        setUid("");
         return;
       }
 
       setStatus("authed");
+      setUid(user.uid || "");
     });
 
     return () => {
@@ -37,7 +40,7 @@ const ProtectedRoute = ({ children }) => {
     return <Navigate to="/login" replace />;
   }
 
-  return children;
+  return <React.Fragment key={uid}>{children}</React.Fragment>;
 };
 
 export default ProtectedRoute;

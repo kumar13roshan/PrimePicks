@@ -25,8 +25,12 @@ router.post("/sale", async (req, res) => {
   const qty = Number(quantity);
   const unitPrice = Number(price);
   const normalizedUnit = typeof unit === "string" ? unit.trim() : "";
+  const normalizedCustomerName = String(customerName || "").trim();
+  const normalizedCustomerPhone = String(customerPhone || "").replace(/\D/g, "");
+  const normalizedCustomerEmail = String(customerEmail || "").trim().toLowerCase();
   const parsedDate = new Date(saleDate);
   const dateIsValid = saleDate && !Number.isNaN(parsedDate.getTime());
+  const emailIsValid = !normalizedCustomerEmail || normalizedCustomerEmail.includes("@");
 
   if (
     !itemName ||
@@ -35,12 +39,15 @@ router.post("/sale", async (req, res) => {
     !Number.isFinite(unitPrice) ||
     unitPrice < 0 ||
     !paymentType ||
-    !customerName ||
-    !customerPhone ||
+    !normalizedCustomerName ||
+    normalizedCustomerPhone.length !== 10 ||
     !invoiceNumber ||
     !dateIsValid
   ) {
     return res.status(400).json({ message: "Invalid sale data" });
+  }
+  if (!emailIsValid) {
+    return res.status(400).json({ message: "Invalid customer email" });
   }
 
   try {
@@ -76,10 +83,10 @@ router.post("/sale", async (req, res) => {
         price: unitPrice,
         unit: saleUnit,
         paymentType,
-        customerName,
-        customerPhone,
+        customerName: normalizedCustomerName,
+        customerPhone: normalizedCustomerPhone,
         customerGstNumber,
-        customerEmail,
+        customerEmail: normalizedCustomerEmail,
         customerAddress,
         invoiceNumber,
         saleDate: parsedDate,

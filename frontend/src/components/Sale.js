@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from "react";
 import BackButton from "./BackButton";
 import ProfileMenu from "./ProfileMenu";
 import { apiFetch } from "../utils/api";
+import { hasAtSymbol, isValidPhone, normalizeEmail, normalizePhone } from "../utils/validation";
 
 const initialDate = new Date().toISOString().slice(0, 10);
 const unitOptions = [
@@ -102,11 +103,23 @@ const SaleManagement = () => {
   };
 
   const processSale = async () => {
-    if (!customerName || !customerPhone || !invoiceNumber || !saleDate) {
+    const trimmedCustomerName = String(customerName || "").trim();
+    const trimmedCustomerEmail = String(customerEmail || "").trim();
+    const normalizedCustomerPhone = normalizePhone(customerPhone);
+
+    if (!trimmedCustomerName || !normalizedCustomerPhone || !invoiceNumber || !saleDate) {
       return alert("Enter customer and invoice details");
     }
     if (!paymentMethod) return alert("Select payment method");
     if (!cart.length) return alert("Cart empty");
+
+    if (!isValidPhone(customerPhone)) {
+      return alert("Enter a 10 digit mobile number.");
+    }
+
+    if (trimmedCustomerEmail && !hasAtSymbol(trimmedCustomerEmail)) {
+      return alert("Email must contain @.");
+    }
 
     for (let item of cart) {
       const res = await apiFetch("/sale", {
@@ -117,10 +130,10 @@ const SaleManagement = () => {
           quantity: item.quantity,
           unit: item.unit,
           paymentType: paymentMethod,
-          customerName,
-          customerPhone,
+          customerName: trimmedCustomerName,
+          customerPhone: normalizedCustomerPhone,
           customerGstNumber,
-          customerEmail,
+          customerEmail: trimmedCustomerEmail ? normalizeEmail(trimmedCustomerEmail) : "",
           customerAddress,
           invoiceNumber,
           saleDate,
@@ -305,7 +318,8 @@ const SaleManagement = () => {
             />
             <input
               type="tel"
-              placeholder="Phone Number *"
+              placeholder="Phone Number * (10 digits)"
+              inputMode="numeric"
               value={customerPhone}
               onChange={(e) => setCustomerPhone(e.target.value)}
               className="input"
