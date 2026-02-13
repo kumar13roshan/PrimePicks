@@ -23,8 +23,9 @@ connectDB();
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
-app.use("/api", adminRoutes);
 app.use("/api", requireAuth);
+
+app.use("/api", adminRoutes);
 app.use("/api", purchaseRoutes);
 app.use("/api", saleRoutes);
 app.use("/api", stockRoutes);
