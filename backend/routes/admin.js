@@ -19,7 +19,10 @@ router.get("/admin", async (req, res) => {
   }
 
   try {
-    const profile = await AdminProfile.findOne({ ownerId: req.user.uid, email });
+    const profile = await AdminProfile.findOne({
+      ownerId: req.user?.uid,
+      email 
+    });
     if (!profile) {
       return res.status(404).json({ message: "Admin profile not found" });
     }
