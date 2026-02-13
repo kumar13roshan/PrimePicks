@@ -20,7 +20,7 @@ router.get("/admin", async (req, res) => {
 
   try {
     const profile = await AdminProfile.findOne({
-      ownerId: req.user?.uid,
+      ownerId: req.user?uid,
       email 
     });
     if (!profile) {
