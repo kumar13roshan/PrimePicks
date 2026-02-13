@@ -8,7 +8,7 @@ const normalizeEmail = (email) => String(email || "").trim().toLowerCase();
 router.get("/admin", async (req, res) => {
   const emailFromToken = normalizeEmail(req.user?.email);
   const emailFromQuery = normalizeEmail(req.query.email);
-  const email = emailFromToken || emailFromQuery;
+  const email = emailFromQuery || emailFromToken;
 
   if (!email) {
     return res.status(400).json({ message: "Email is required" });
