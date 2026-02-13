@@ -30,6 +30,5 @@ app.use("/api", purchaseRoutes);
 app.use("/api", saleRoutes);
 app.use("/api", stockRoutes);
 app.use("/api", transactionRoutes);
-app.use("/api", adminRoutes);
 
 app.listen(PORT, () => console.log(`Backend running at http://localhost:${PORT}`));
