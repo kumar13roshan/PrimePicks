@@ -69,7 +69,7 @@ router.post("/admin", async (req, res) => {
     const profile = await AdminProfile.findOneAndUpdate(
       { ownerId: req.user.uid },
       {
-        ownerId: req.user.uid,
+        ownerId: req.user?uid,
         email: normalizedEmail,
         name: normalizedName,
         shopName: normalizedShopName,
