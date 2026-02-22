@@ -82,4 +82,15 @@ router.post("/admin", async (req, res) => {
   }
 });
 
+// ✅ NEW: Delete route
+router.delete("/admin", async (req, res) => {
+  try {
+    await AdminProfile.findOneAndDelete({ ownerId: req.user.uid });
+    return res.json({ message: "Admin profile deleted successfully" });
+  } catch (err) {
+    console.error("Delete admin profile error:", err.message);
+    return res.status(500).json({ message: "Failed to delete admin profile" });
+  }
+});
+
 export default router;
