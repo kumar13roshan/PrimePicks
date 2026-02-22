@@ -2,8 +2,8 @@ import mongoose from "mongoose";
 
 const adminProfileSchema = new mongoose.Schema(
   {
-    ownerId: { type: String, required: true, index: true },
-    email: { type: String, required: true, trim: true, lowercase: true, unique: true },
+    ownerId: { type: String, required: true, index: true, unique: true },
+    email: { type: String, required: true, trim: true, lowercase: true },
     name: { type: String, required: true, trim: true },
     shopName: { type: String, required: true, trim: true },
     gstNumber: { type: String, required: true, trim: true },
