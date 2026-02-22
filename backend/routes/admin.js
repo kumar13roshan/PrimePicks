@@ -21,13 +21,14 @@ router.get("/admin", async (req, res) => {
   try {
     const profile = await AdminProfile.findOne({
       ownerId: req.user?.uid,
-      email 
+      email,
     });
     if (!profile) {
       return res.status(404).json({ message: "Admin profile not found" });
     }
     return res.json(profile);
   } catch (err) {
+    console.error("Load admin profile error:", err.message);
     return res.status(500).json({ message: "Failed to load admin profile" });
   }
 });
@@ -51,13 +52,7 @@ router.post("/admin", async (req, res) => {
   const normalizedAddress = String(address || "").trim();
   const normalizedPhone = String(phone || "").trim();
 
-  if (
-    !normalizedEmail ||
-    !normalizedName ||
-    !normalizedShopName ||
-    !normalizedGstNumber ||
-    !normalizedAddress
-  ) {
+  if (!normalizedEmail || !normalizedName || !normalizedShopName || !normalizedGstNumber || !normalizedAddress) {
     return res.status(400).json({ message: "Missing required admin details" });
   }
 
@@ -82,7 +77,8 @@ router.post("/admin", async (req, res) => {
 
     return res.json(profile);
   } catch (err) {
-    return res.status(500).json({ message: "Failed to save admin profile" });
+    console.error("Save admin profile error:", err.message, err.code);
+    return res.status(500).json({ message: "Failed to save admin profile", detail: err.message });
   }
 });
 
