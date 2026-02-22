@@ -161,7 +161,7 @@ const AdminDetails = () => {
 
   // ✅ NEW: Delete handler
   const handleDelete = async () => {
-    if (!window.confirm("Kya aap sure hain? Ye admin profile permanently delete ho jayega.")) {
+    if (!window.confirm("Are You Sure!! This will delete your details permanently.")) {
       return;
     }
 
