@@ -35,7 +35,9 @@ const AdminDetails = () => {
   const [savedProfile, setSavedProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
     let active = true;
@@ -81,13 +83,8 @@ const AdminDetails = () => {
           const data = await readJson(res);
           if (!active) return;
           setSavedProfile(data);
-          setForm({
-            name: data.name || displayName || "",
-            shopName: data.shopName || "",
-            gstNumber: data.gstNumber || "",
-            address: data.address || "",
-            phone: data.phone || "",
-          });
+          // ✅ Input fields empty rakhna — form fill nahi hoga saved data se
+          setForm(buildEmptyForm(displayName));
         } else if (res.status !== 404) {
           const data = await readJson(res);
           setErrorMessage(data.message || "Unable to load admin details.");
@@ -119,6 +116,7 @@ const AdminDetails = () => {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setErrorMessage("");
+    setSuccessMessage("");
 
     if (!email) {
       setErrorMessage("No email found for this account.");
@@ -151,11 +149,41 @@ const AdminDetails = () => {
       }
 
       setSavedProfile(data);
-      navigate("/dashboard", { replace: true });
+      // ✅ Save ke baad form empty karo
+      setForm(buildEmptyForm(""));
+      setSuccessMessage("Admin details saved successfully!");
     } catch (err) {
       setErrorMessage(err.message || "Failed to save admin details.");
     } finally {
       setSaving(false);
+    }
+  };
+
+  // ✅ NEW: Delete handler
+  const handleDelete = async () => {
+    if (!window.confirm("Kya aap sure hain? Ye admin profile permanently delete ho jayega.")) {
+      return;
+    }
+
+    setErrorMessage("");
+    setSuccessMessage("");
+    setDeleting(true);
+
+    try {
+      const res = await apiFetch("/admin", { method: "DELETE" });
+      const data = await readJson(res);
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to delete admin profile");
+      }
+
+      setSavedProfile(null);
+      setForm(buildEmptyForm(""));
+      setSuccessMessage("Admin profile deleted successfully!");
+    } catch (err) {
+      setErrorMessage(err.message || "Failed to delete admin profile.");
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -184,7 +212,15 @@ const AdminDetails = () => {
               <div className="card" style={{ background: "var(--surface-alt)" }}>
                 <div className="card-header">
                   <h2>Current Admin Details</h2>
-                  <span className="badge">Saved</span>
+                  {/* ✅ Delete button */}
+                  <button
+                    type="button"
+                    className="btn danger"
+                    onClick={handleDelete}
+                    disabled={deleting}
+                  >
+                    {deleting ? "Deleting..." : "Delete Profile"}
+                  </button>
                 </div>
                 <div className="grid two">
                   <div className="field">
@@ -276,13 +312,20 @@ const AdminDetails = () => {
                 required
               />
             </label>
+
+            {successMessage && (
+              <p className="auth-success" aria-live="polite" style={{ color: "green" }}>
+                {successMessage}
+              </p>
+            )}
             {errorMessage && (
               <p className="auth-error" aria-live="polite">
                 {errorMessage}
               </p>
             )}
+
             <div className="row">
-              <button type="submit" className="btn primary" disabled={saving}>
+              <button type="submit" className="btn primary" disabled={saving || deleting}>
                 {saving ? "Saving..." : "Save Details"}
               </button>
             </div>
