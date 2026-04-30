@@ -27,7 +27,6 @@ app.get("/api/health", (req, res) => {
 
 
 app.use("/api", authRoutes);
->>>>>>> c5d8d4a (Updated PrimePicks: Firebase removed, JWT added)
 app.use("/api", requireAuth);
 
 app.use("/api", adminRoutes);
