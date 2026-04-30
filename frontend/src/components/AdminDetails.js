@@ -76,18 +76,13 @@ const AdminDetails = () => {
           const data = await readJson(res);
           if (!active) return;
           setSavedProfile(data);
-<<<<<<< HEAD
-          // ✅ Input fields empty rakhna — form fill nahi hoga saved data se
-          setForm(buildEmptyForm(displayName));
-=======
-          setForm({
-            name: data.name || user.name || "",
-            shopName: data.shopName || "",
-            gstNumber: data.gstNumber || "",
-            address: data.address || "",
-            phone: data.phone || "",
-          });
->>>>>>> c5d8d4a (Updated PrimePicks: Firebase removed, JWT added)
+setForm({
+  name: data.name || user.name || "",
+  shopName: data.shopName || "",
+  gstNumber: data.gstNumber || "",
+  address: data.address || "",
+  phone: data.phone || "",
+});
         } else if (res.status !== 404) {
           const data = await readJson(res);
           if (active) {
