@@ -17,7 +17,7 @@ const WelcomePage = () => {
         </p>
         <div className="hero-actions">
           <button className="btn accent" onClick={() => navigate("/login")}>Get Started</button>
-          <span className="hero-note">Secure sign-in with email or Google</span>
+          <span className="hero-note">Secure sign-in with  your email </span>
         </div>
       </div>
     </div>
