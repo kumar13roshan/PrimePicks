@@ -24,8 +24,7 @@ connectDB();
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok" });
 });
-<<<<<<< HEAD
-=======
+
 
 app.use("/api", authRoutes);
 >>>>>>> c5d8d4a (Updated PrimePicks: Firebase removed, JWT added)
