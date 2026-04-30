@@ -1,42 +1,21 @@
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../firebase";
+import { getCurrentUser, isAuthenticated, subscribeToSession } from "../utils/auth";
 
 const ProtectedRoute = ({ children }) => {
-  const [status, setStatus] = useState("loading");
-  const [uid, setUid] = useState("");
+  const [authenticated, setAuthenticated] = useState(() => isAuthenticated());
+  const [uid, setUid] = useState(() => getCurrentUser()?.uid || "");
 
   useEffect(() => {
-    let active = true;
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!active) return;
-
-      if (!user) {
-        setStatus("guest");
-        setUid("");
-        return;
-      }
-
-      setStatus("authed");
-      setUid(user.uid || "");
+    const unsubscribe = subscribeToSession((session) => {
+      setAuthenticated(Boolean(session?.token));
+      setUid(session?.user?.uid || "");
     });
 
-    return () => {
-      active = false;
-      unsubscribe();
-    };
+    return unsubscribe;
   }, []);
 
-  if (status === "loading") {
-    return (
-      <div className="page full">
-        <p className="subtitle">Checking login…</p>
-      </div>
-    );
-  }
-
-  if (status === "guest") {
+  if (!authenticated) {
     return <Navigate to="/login" replace />;
   }
 

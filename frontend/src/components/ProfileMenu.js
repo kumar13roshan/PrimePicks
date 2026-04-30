@@ -1,30 +1,20 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "../firebase";
 import logo from "../assets/PrimePicks.png";
+import { clearSession, getCurrentUser, subscribeToSession } from "../utils/auth";
 
 const ProfileMenu = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
-  const [userInfo, setUserInfo] = useState(null);
+  const [userInfo, setUserInfo] = useState(() => getCurrentUser());
   const menuRef = useRef(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        setUserInfo(null);
-        return;
-      }
-
-      setUserInfo({
-        email: user.email || "",
-        name: user.displayName || "PrimePicks Admin",
-        photoURL: user.photoURL || "",
-      });
+    const unsubscribe = subscribeToSession((session) => {
+      setUserInfo(session?.user || null);
     });
 
-    return () => unsubscribe();
+    return unsubscribe;
   }, []);
 
   useEffect(() => {
@@ -50,13 +40,9 @@ const ProfileMenu = () => {
     };
   }, []);
 
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      navigate("/");
-    } catch (error) {
-      alert(error.message);
-    }
+  const handleLogout = () => {
+    clearSession();
+    navigate("/login", { replace: true });
   };
 
   return (
@@ -69,7 +55,7 @@ const ProfileMenu = () => {
         aria-expanded={open}
         aria-label="Open account menu"
       >
-        <img src={userInfo?.photoURL || logo} alt="Account" />
+        <img src={logo} alt="Account" />
       </button>
       {open && (
         <div className="profile-menu" role="menu">

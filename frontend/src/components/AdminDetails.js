@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../firebase";
 import ProfileMenu from "./ProfileMenu";
 import { apiFetch } from "../utils/api";
+import { getCurrentUser, subscribeToSession } from "../utils/auth";
 
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
@@ -30,8 +29,9 @@ const readJson = async (res) => {
 
 const AdminDetails = () => {
   const navigate = useNavigate();
-  const [email, setEmail] = useState("");
-  const [form, setForm] = useState(() => buildEmptyForm(""));
+  const [user, setUser] = useState(() => getCurrentUser());
+  const [email, setEmail] = useState(() => normalizeEmail(getCurrentUser()?.email));
+  const [form, setForm] = useState(() => buildEmptyForm(getCurrentUser()?.name || ""));
   const [savedProfile, setSavedProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -40,57 +40,62 @@ const AdminDetails = () => {
   const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
+    const unsubscribe = subscribeToSession((session) => {
+      const nextUser = session?.user || null;
+      setUser(nextUser);
+      setEmail(normalizeEmail(nextUser?.email));
+      if (!nextUser) {
+        navigate("/login", { replace: true });
+      }
+    });
+
+    return unsubscribe;
+  }, [navigate]);
+
+  useEffect(() => {
     let active = true;
-    let controller;
+    const controller = new AbortController();
 
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (!active) return;
-
-      if (controller) {
-        controller.abort();
-        controller = undefined;
+    const loadProfile = async () => {
+      if (!user?.email) {
+        setLoading(false);
+        return;
       }
 
       setLoading(true);
       setErrorMessage("");
       setSavedProfile(null);
-
-      if (!user) {
-        setEmail("");
-        setForm(buildEmptyForm(""));
-        setLoading(false);
-        navigate("/login", { replace: true });
-        return;
-      }
-
-      const displayName = String(user.displayName || "").trim();
-      const userEmail = normalizeEmail(user.email);
-      setEmail(userEmail);
-      setForm(buildEmptyForm(displayName));
-
-      if (!userEmail) {
-        setErrorMessage("No email found for this account.");
-        setLoading(false);
-        return;
-      }
+      setForm(buildEmptyForm(user.name || ""));
 
       try {
-        controller = new AbortController();
-        const res = await apiFetch(`/admin?email=${encodeURIComponent(userEmail)}`, {
+        const res = await apiFetch(`/admin?email=${encodeURIComponent(normalizeEmail(user.email))}`, {
           signal: controller.signal,
         });
+
         if (res.ok) {
           const data = await readJson(res);
           if (!active) return;
           setSavedProfile(data);
+<<<<<<< HEAD
           // ✅ Input fields empty rakhna — form fill nahi hoga saved data se
           setForm(buildEmptyForm(displayName));
+=======
+          setForm({
+            name: data.name || user.name || "",
+            shopName: data.shopName || "",
+            gstNumber: data.gstNumber || "",
+            address: data.address || "",
+            phone: data.phone || "",
+          });
+>>>>>>> c5d8d4a (Updated PrimePicks: Firebase removed, JWT added)
         } else if (res.status !== 404) {
           const data = await readJson(res);
-          setErrorMessage(data.message || "Unable to load admin details.");
+          if (active) {
+            setErrorMessage(data.message || "Unable to load admin details.");
+          }
         }
       } catch (err) {
-        if (err?.name !== "AbortError") {
+        if (err?.name !== "AbortError" && active) {
           setErrorMessage(err?.message || "Unable to load admin details.");
         }
       } finally {
@@ -98,16 +103,15 @@ const AdminDetails = () => {
           setLoading(false);
         }
       }
-    });
+    };
+
+    loadProfile();
 
     return () => {
       active = false;
-      if (controller) {
-        controller.abort();
-      }
-      unsubscribe();
+      controller.abort();
     };
-  }, [navigate]);
+  }, [user]);
 
   const handleChange = (field) => (event) => {
     setForm((prev) => ({ ...prev, [field]: event.target.value }));

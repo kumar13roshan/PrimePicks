@@ -127,7 +127,7 @@ const Dashboard = () => {
     fetchStats();
   }, []);
 
-  const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString()}`;
+  const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
   return (
     <div className="page full">
@@ -257,7 +257,6 @@ const Dashboard = () => {
                 formatter={(value, name) => [
                   formatCurrency(value),
                   name === "profit" ? "Profit" : "Loss",
-                  name === "profit" ? "Profit" : "Loss",
                 ]}
               />
               <Bar dataKey="profit" fill="var(--primary)" radius={[8, 8, 0, 0]} />
@@ -272,3 +271,4 @@ const Dashboard = () => {
 };
 
 export default Dashboard;
+

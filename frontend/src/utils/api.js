@@ -1,37 +1,30 @@
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../firebase";
+import { clearSession, getToken } from "./auth";
 
-const API_BASE = process.env.REACT_APP_API_URL || "/api";
+const isLocalHost =
+  typeof window !== "undefined" &&
+  (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
 
-const waitForAuth = () =>
-  new Promise((resolve) => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      unsubscribe();
-      resolve(user);
-    });
-  });
-
-const getAuthToken = async () => {
-  let user = auth.currentUser;
-  if (!user) {
-    user = await waitForAuth();
-  }
-  if (!user) {
-    throw new Error("Not authenticated");
-  }
-  return user.getIdToken(true);
-};
+const API_BASE = process.env.REACT_APP_API_URL || (isLocalHost ? "http://localhost:5001/api" : "/api");
 
 export const apiFetch = async (path, options = {}) => {
-  const token = await getAuthToken();
   const headers = new Headers(options.headers || {});
-  headers.set("Authorization", `Bearer ${token}`);
+  const token = getToken();
+
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
 
   if (options.body && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 
-  return fetch(`${API_BASE}${path}`, { ...options, headers });
+  const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+
+  if (response.status === 401) {
+    clearSession();
+  }
+
+  return response;
 };
 
 export { API_BASE };

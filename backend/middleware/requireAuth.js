@@ -1,6 +1,6 @@
-import admin from "../config/firebaseAdmin.js";
+import { verifyToken } from "../utils/auth.js";
 
-const requireAuth = async (req, res, next) => {
+const requireAuth = (req, res, next) => {
   if (req.method === "OPTIONS") {
     return next();
   }
@@ -13,14 +13,15 @@ const requireAuth = async (req, res, next) => {
   }
 
   try {
-    const decoded = await admin.auth().verifyIdToken(match[1]);
+    const decoded = verifyToken(match[1]);
     req.user = {
-      uid: decoded.uid,
-      email: decoded.email || "",
+      uid: decoded.sub,
+      email: decoded.email,
+      name: decoded.name || "",
     };
     return next();
   } catch (error) {
-    return res.status(401).json({ message: "Invalid auth token" });
+    return res.status(401).json({ message: "Invalid or expired auth token" });
   }
 };
 

@@ -2,7 +2,7 @@
   "name": "primepicks",
   "version": "1.0.0",
   "private": true,
-  "proxy": "https://primepicks-backend-72gw.onrender.com",
+  "proxy": "http://localhost:5001",
   "dependencies": {
     "autoprefixer": "^10.4.21",
     "axios": "^1.8.4",
@@ -23,9 +23,9 @@
     "tailwindcss": "^4.1.7"
   },
   "scripts": {
-    "start": "react-scripts start",
-    "build": "react-scripts build",
-    "test": "react-scripts test",
+    "start": "node scripts/run-react-scripts.js start",
+    "build": "node scripts/run-react-scripts.js build",
+    "test": "node scripts/run-react-scripts.js test",
     "eject": "react-scripts eject"
   },
   "eslintConfig": {

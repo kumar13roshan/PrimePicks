@@ -1,48 +1,84 @@
 import React, { useEffect, useState } from "react";
-import {
-  signInWithPopup,
-  signInWithEmailAndPassword,
-  onAuthStateChanged,
-} from "firebase/auth";
 import { useNavigate } from "react-router-dom";
 import logo from "../assets/PrimePicks.png";
 import BackButton from "./BackButton";
-import { auth, provider } from "../firebase";
+import { API_BASE } from "../utils/api";
+import { isAuthenticated, saveSession } from "../utils/auth";
+
+const readJson = async (response) => {
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    return response.json();
+  }
+
+  const text = await response.text();
+  return { message: text || "Unexpected server response." };
+};
 
 const Login = () => {
   const navigate = useNavigate();
+  const [mode, setMode] = useState("login");
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        navigate("/dashboard", { replace: true });
-      }
-    });
-
-    return () => unsubscribe();
+    if (isAuthenticated()) {
+      navigate("/dashboard", { replace: true });
+    }
   }, [navigate]);
 
-  const handleGoogleLogin = async () => {
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+    setErrorMessage("");
+
+    if (!email.trim() || !password) {
+      setErrorMessage("Email and password are required.");
+      return;
+    }
+
+    if (mode === "signup" && !name.trim()) {
+      setErrorMessage("Name is required to create an account.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
     try {
-      await signInWithPopup(auth, provider);
+      const endpoint = mode === "signup" ? "/auth/signup" : "/auth/login";
+      const response = await fetch(`${API_BASE}${endpoint}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: email.trim(),
+          password,
+        }),
+      });
+
+      const data = await readJson(response);
+      if (!response.ok) {
+        throw new Error(data.message || "Authentication failed.");
+      }
+
+      saveSession({
+        token: data.token,
+        user: data.user,
+      });
+
       navigate("/dashboard", { replace: true });
     } catch (error) {
-      console.error(error);
-      setErrorMessage("Google login failed. Please try again.");
+      setErrorMessage(error.message || "Authentication failed.");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  const handleEmailPasswordLogin = async () => {
-    try {
-      await signInWithEmailAndPassword(auth, email, password);
-      navigate("/dashboard", { replace: true });
-    } catch (error) {
-      setErrorMessage("Invalid email or password");
-    }
-  };
+  const isSignup = mode === "signup";
 
   return (
     <div className="page full hero auth-page">
@@ -52,54 +88,78 @@ const Login = () => {
             <img src={logo} alt="PrimePicks Logo" className="auth-logo" />
             <div>
               <p className="auth-kicker">PrimePicks</p>
-              <h2 className="auth-title">Welcome back</h2>
-              <p className="auth-subtitle">Your store, beautifully organized.</p>
+              <h2 className="auth-title">{isSignup ? "Create your account" : "Welcome back"}</h2>
+              <p className="auth-subtitle">Simple login for your store dashboard.</p>
             </div>
           </div>
           <ul className="auth-list">
-            <li>Track purchases and stock in real time.</li>
-            <li>Send clean invoices with every sale.</li>
-            <li>See profit and loss instantly.</li>
+            <li>Sign up once and access your inventory anytime.</li>
+            <li>Keep purchases, sales, and stock tied to your account.</li>
+            <li>No Firebase setup required.</li>
           </ul>
           <div className="auth-meta">
-            <span className="badge">Secure sign-in</span>
-            <span className="badge accent">Lightning fast</span>
+            <span className="badge">{isSignup ? "Quick signup" : "Secure login"}</span>
+            <span className="badge accent">JWT session</span>
           </div>
         </div>
 
-        <div className="auth-form">
+        <form className="auth-form" onSubmit={handleSubmit}>
           <BackButton />
           <div>
-            <h3 className="auth-form-title">Sign in to continue</h3>
-            <p className="subtitle">Access your dashboard in seconds.</p>
+            <h3 className="auth-form-title">{isSignup ? "Create account" : "Sign in to continue"}</h3>
+            <p className="subtitle">
+              {isSignup ? "Set up your store account in a minute." : "Access your dashboard in seconds."}
+            </p>
+          </div>
+          <div className="row" style={{ gap: 10 }}>
+            <button
+              type="button"
+              className={`btn ${!isSignup ? "primary" : "ghost"}`}
+              onClick={() => setMode("login")}
+            >
+              Login
+            </button>
+            <button
+              type="button"
+              className={`btn ${isSignup ? "primary" : "ghost"}`}
+              onClick={() => setMode("signup")}
+            >
+              Sign Up
+            </button>
           </div>
           <div className="stack">
+            {isSignup && (
+              <input
+                type="text"
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Full Name"
+                className="input"
+                autoComplete="name"
+              />
+            )}
             <input
               type="email"
               value={email}
-              onChange={(e) => setEmail(e.target.value)}
+              onChange={(event) => setEmail(event.target.value)}
               placeholder="Email"
               className="input"
+              autoComplete="email"
             />
             <input
               type="password"
               value={password}
-              onChange={(e) => setPassword(e.target.value)}
+              onChange={(event) => setPassword(event.target.value)}
               placeholder="Password"
               className="input"
+              autoComplete={isSignup ? "new-password" : "current-password"}
             />
             {errorMessage && <p className="auth-error">{errorMessage}</p>}
-            <button onClick={handleEmailPasswordLogin} className="btn primary">
-              Login with Email
-            </button>
-            <div className="row" style={{ justifyContent: "center" }}>
-              <span className="badge">OR</span>
-            </div>
-            <button onClick={handleGoogleLogin} className="btn accent">
-              Login with Google
+            <button type="submit" className="btn primary" disabled={isSubmitting}>
+              {isSubmitting ? "Please wait..." : isSignup ? "Create Account" : "Login"}
             </button>
           </div>
-        </div>
+        </form>
       </div>
     </div>
   );
