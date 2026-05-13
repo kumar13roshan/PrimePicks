@@ -2,6 +2,7 @@ import express from "express";
 import mongoose from "mongoose";
 import Sale from "../models/Sale.js";
 import Stock from "../models/Stock.js";
+import { ownerFilter } from "../utils/ownership.js";
 
 const router = express.Router();
 
@@ -51,7 +52,7 @@ router.post("/sale", async (req, res) => {
   }
 
   try {
-    const stockDoc = await Stock.findOne({ itemName, ownerId });
+    const stockDoc = await Stock.findOne({ itemName, ...ownerFilter(req.user) });
 
     if (!stockDoc) {
       return res.status(400).json({ message: "Not enough stock" });
@@ -65,8 +66,8 @@ router.post("/sale", async (req, res) => {
 
     const saleUnit = stockDoc.unit || normalizedUnit || "pcs";
     const stock = await Stock.findOneAndUpdate(
-      { _id: stockDoc._id, ownerId, quantity: { $gte: qty } },
-      { $inc: { quantity: -qty }, $set: { unit: saleUnit } },
+      { _id: stockDoc._id, quantity: { $gte: qty } },
+      { $inc: { quantity: -qty }, $set: { ownerId, unit: saleUnit } },
       { new: true }
     );
 
@@ -109,7 +110,7 @@ router.post("/sale", async (req, res) => {
 // GET SALES
 router.get("/sale", async (req, res) => {
   try {
-    const sales = await Sale.find({ ownerId: req.user.uid }).sort({ saleDate: -1, date: -1 });
+    const sales = await Sale.find(ownerFilter(req.user)).sort({ saleDate: -1, date: -1 });
     res.json(sales);
   } catch (err) {
     res.status(500).json({ message: "Failed to load sales" });
@@ -126,23 +127,24 @@ router.delete("/sale/:id", async (req, res) => {
   }
 
   try {
-    const sale = await Sale.findOne({ _id: id, ownerId });
+    const sale = await Sale.findOne({ _id: id, ...ownerFilter(req.user) });
 
     if (!sale) {
       return res.status(404).json({ message: "Sale not found" });
     }
 
     const stock = await Stock.findOneAndUpdate(
-      { itemName: sale.itemName, ownerId },
+      { itemName: sale.itemName, ...ownerFilter(req.user) },
       {
         $inc: { quantity: sale.quantity },
+        $set: { ownerId },
         $setOnInsert: { price: sale.price, unit: sale.unit || "pcs" },
       },
       { new: true, upsert: true }
     );
 
     try {
-      await Sale.deleteOne({ _id: sale._id, ownerId });
+      await Sale.deleteOne({ _id: sale._id, ...ownerFilter(req.user) });
     } catch (err) {
       await Stock.updateOne({ _id: stock._id }, { $inc: { quantity: -sale.quantity } });
       throw err;

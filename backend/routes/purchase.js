@@ -2,13 +2,14 @@ import express from "express";
 import mongoose from "mongoose";
 import Purchase from "../models/Purchase.js";
 import Stock from "../models/Stock.js";
+import { ownerFilter } from "../utils/ownership.js";
 
 const router = express.Router();
 
 // GET ALL PURCHASES
 router.get("/purchase", async (req, res) => {
   try {
-    const purchases = await Purchase.find({ ownerId: req.user.uid }).sort({ purchaseDate: -1, date: -1 });
+    const purchases = await Purchase.find(ownerFilter(req.user)).sort({ purchaseDate: -1, date: -1 });
     res.json(purchases);
   } catch (err) {
     res.status(500).json({ message: "Failed to load purchases" });
@@ -61,7 +62,7 @@ router.post("/purchase", async (req, res) => {
   }
 
   try {
-    const existingStock = await Stock.findOne({ itemName, ownerId });
+    const existingStock = await Stock.findOne({ itemName, ...ownerFilter(req.user) });
     if (existingStock?.unit && existingStock.unit !== normalizedUnit) {
       return res.status(400).json({
         message: `Unit mismatch. ${itemName} is tracked in ${existingStock.unit}.`,
@@ -87,8 +88,8 @@ router.post("/purchase", async (req, res) => {
     let stock;
     try {
       stock = await Stock.findOneAndUpdate(
-        { itemName, ownerId },
-        { $inc: { quantity: qty }, $set: { price: unitPrice, unit: normalizedUnit } },
+        existingStock ? { _id: existingStock._id } : { itemName, ownerId },
+        { $inc: { quantity: qty }, $set: { ownerId, price: unitPrice, unit: normalizedUnit } },
         { new: true, upsert: true }
       );
     } catch (err) {
@@ -116,20 +117,20 @@ router.delete("/purchase/:id", async (req, res) => {
   }
 
   try {
-    const purchase = await Purchase.findOne({ _id: id, ownerId });
+    const purchase = await Purchase.findOne({ _id: id, ...ownerFilter(req.user) });
 
     if (!purchase) {
       return res.status(404).json({ message: "Purchase not found" });
     }
 
-    const stock = await Stock.findOne({ itemName: purchase.itemName, ownerId });
+    const stock = await Stock.findOne({ itemName: purchase.itemName, ...ownerFilter(req.user) });
     if (stock) {
       stock.quantity = Math.max(0, stock.quantity - purchase.quantity);
       await stock.save();
     }
 
     try {
-      await Purchase.deleteOne({ _id: purchase._id, ownerId });
+      await Purchase.deleteOne({ _id: purchase._id, ...ownerFilter(req.user) });
     } catch (err) {
       if (stock) {
         stock.quantity += purchase.quantity;

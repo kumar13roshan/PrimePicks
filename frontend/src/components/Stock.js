@@ -1,6 +1,4 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import BackButton from "./BackButton";
-import ProfileMenu from "./ProfileMenu";
 import { apiFetch } from "../utils/api";
 
 const unitOptions = [
@@ -227,10 +225,6 @@ const StockApp = () => {
 
   return (
     <div className="page full fill">
-      <div className="topbar">
-        <BackButton />
-        <ProfileMenu />
-      </div>
       <div className="page-header">
         <div>
           <p className="kicker">Inventory</p>

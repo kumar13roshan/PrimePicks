@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import BackButton from "./BackButton";
-import ProfileMenu from "./ProfileMenu";
 import { apiFetch } from "../utils/api";
 
 const Dashboard = () => {
@@ -131,14 +129,12 @@ const Dashboard = () => {
 
   return (
     <div className="page full">
-      <BackButton />
-      <div className="topbar">
+      <div className="page-header">
         <div>
           <p className="kicker">Dashboard</p>
           <h1>PrimePicks in a glance</h1>
           <p className="subtitle">A calm, clear view of what matters today.</p>
         </div>
-        <ProfileMenu />
       </div>
 
       <div className="stat-grid">

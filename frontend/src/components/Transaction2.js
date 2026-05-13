@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from "react";
 import gpayQR from "../assets/gpay.png";
-import BackButton from "./BackButton";
-import ProfileMenu from "./ProfileMenu";
 import { apiFetch } from "../utils/api";
 
 const Transactions = () => {
@@ -12,6 +10,10 @@ const Transactions = () => {
   const [openingForm, setOpeningForm] = useState({ cash: "0", online: "0" });
   const [openingSaving, setOpeningSaving] = useState(false);
   const [openingError, setOpeningError] = useState("");
+  const [isQrVisible, setQrVisible] = useState(false);
+  const [qrImage, setQrImage] = useState("");
+  const [paymentDetails, setPaymentDetails] = useState(null);
+  const [showGpay, setShowGpay] = useState(false);
 
   useEffect(() => {
     const fetchTransactions = async () => {
@@ -55,19 +57,14 @@ const Transactions = () => {
     fetchOpeningBalances();
   }, []);
 
-  const cashTransactions = transactions.filter(txn => txn.paymentType === "Cash");
-  const onlineTransactions = transactions.filter(txn => txn.paymentType === "Online");
-
-  const [isQrVisible, setQrVisible] = useState(false);
-  const [qrImage, setQrImage] = useState("");
-  const [paymentDetails, setPaymentDetails] = useState(null);
-  const [showGpay, setShowGpay] = useState(false);
+  const cashTransactions = transactions.filter((txn) => txn.paymentType === "Cash");
+  const onlineTransactions = transactions.filter((txn) => txn.paymentType === "Online");
 
   const showQR = () => {
     setQrImage(gpayQR);
     setPaymentDetails({
       transactionId: "TX123456",
-      amount: "₹500",
+      amount: "Rs 500",
       date: "2025-03-31",
       status: "Pending",
       paymentMethod: "GPay",
@@ -84,20 +81,54 @@ const Transactions = () => {
     setQrVisible(false);
   };
 
-  const formatDate = (value) => {
-    if (!value) return "-";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleDateString();
-  };
-
   const getTotal = (txn) => Number(txn.price || 0) * Number(txn.quantity || 0);
-  const formatCurrency = (value) => `₹${Number(value || 0).toLocaleString()}`;
+  const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
   const cashSalesTotal = cashTransactions.reduce((sum, txn) => sum + getTotal(txn), 0);
   const onlineSalesTotal = onlineTransactions.reduce((sum, txn) => sum + getTotal(txn), 0);
   const cashTotal = Number(openingBalances.cash || 0) + cashSalesTotal;
   const onlineTotal = Number(openingBalances.online || 0) + onlineSalesTotal;
+
+  const renderTransactionTable = (rows) => (
+    <div className="scroll-panel">
+      <table className="table sheet-table transaction-table">
+        <thead>
+          <tr>
+            <th>Invoice Number</th>
+            <th>Name</th>
+            <th>Amount</th>
+            <th>Mode</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((txn, index) => (
+            <tr key={`${txn._id || txn.invoiceNumber}-${index}`}>
+              <td>{txn.invoiceNumber || txn._id}</td>
+              <td>
+                <strong>{txn.customerName || "-"}</strong>
+              </td>
+              <td>
+                <strong>{formatCurrency(getTotal(txn))}</strong>
+              </td>
+              <td>{txn.paymentType || "-"}</td>
+            </tr>
+          ))}
+        </tbody>
+        <tfoot>
+          <tr>
+            <td>
+              <strong>Total</strong>
+            </td>
+            <td>{rows.length} transactions</td>
+            <td>
+              <strong>{formatCurrency(rows.reduce((sum, txn) => sum + getTotal(txn), 0))}</strong>
+            </td>
+            <td></td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  );
 
   const saveOpeningBalances = async () => {
     const cash = Number(openingForm.cash);
@@ -129,10 +160,6 @@ const Transactions = () => {
 
   return (
     <div className="page full">
-      <div className="topbar">
-        <BackButton />
-        <ProfileMenu />
-      </div>
       <div className="page-header">
         <div>
           <p className="kicker">Transactions</p>
@@ -171,12 +198,7 @@ const Transactions = () => {
               />
             </div>
           </div>
-          <button
-            type="button"
-            className="btn primary"
-            onClick={saveOpeningBalances}
-            disabled={openingSaving}
-          >
+          <button type="button" className="btn primary" onClick={saveOpeningBalances} disabled={openingSaving}>
             {openingSaving ? "Saving..." : "Save Opening Balances"}
           </button>
           {openingError && <p className="subtitle">{openingError}</p>}
@@ -220,7 +242,7 @@ const Transactions = () => {
       </div>
 
       <div className="grid two">
-        <section className="card">
+        <section className="card scroll-card">
           <div className="card-header">
             <div>
               <h2>Cash Transactions</h2>
@@ -233,24 +255,13 @@ const Transactions = () => {
           ) : errorMessage ? (
             <p className="subtitle">{errorMessage}</p>
           ) : cashTransactions.length > 0 ? (
-            <ul className="list">
-              {cashTransactions.map((txn, index) => (
-                <li key={index} className="list-item">
-                  <strong>Invoice:</strong> {txn.invoiceNumber || txn._id} <br />
-                  <strong>Amount:</strong> ₹{getTotal(txn)} <br />
-                  <strong>Customer:</strong>{" "}
-                  {([txn.customerName, txn.customerPhone].filter(Boolean).join(" · ")) || "-"} <br />
-                  <strong>Payment Mode:</strong> {txn.paymentType} <br />
-                  <strong>Date:</strong> {formatDate(txn.saleDate || txn.date)}
-                </li>
-              ))}
-            </ul>
+            renderTransactionTable(cashTransactions)
           ) : (
             <p className="subtitle">No Cash Transactions Found</p>
           )}
         </section>
 
-        <section className="card clickable" onClick={handleOnlineTransactionsClick}>
+        <section className="card clickable scroll-card" onClick={handleOnlineTransactionsClick}>
           <div className="card-header">
             <div>
               <h2>Online Transactions</h2>
@@ -263,23 +274,14 @@ const Transactions = () => {
           ) : errorMessage ? (
             <p className="subtitle">{errorMessage}</p>
           ) : onlineTransactions.length > 0 ? (
-            <ul className="list">
-              {onlineTransactions.map((txn, index) => (
-                <li key={index} className="list-item">
-                  <strong>Invoice:</strong> {txn.invoiceNumber || txn._id} <br />
-                  <strong>Amount:</strong> ₹{getTotal(txn)} <br />
-                  <strong>Customer:</strong>{" "}
-                  {([txn.customerName, txn.customerPhone].filter(Boolean).join(" · ")) || "-"} <br />
-                  <strong>Payment Mode:</strong> {txn.paymentType} <br />
-                  <strong>Date:</strong> {formatDate(txn.saleDate || txn.date)}
-                </li>
-              ))}
-            </ul>
+            renderTransactionTable(onlineTransactions)
           ) : (
             <p className="subtitle">No Online Transactions Found</p>
           )}
           {showGpay && onlineTransactions.length > 0 && !loading && !errorMessage && (
-            <button className="btn primary" onClick={showQR}>Pay with GPay</button>
+            <button className="btn primary" onClick={showQR}>
+              Pay with GPay
+            </button>
           )}
         </section>
       </div>
@@ -300,13 +302,25 @@ const Transactions = () => {
               <div className="stack sm">
                 <h3>Transaction Details</h3>
                 <div className="card" style={{ padding: 14 }}>
-                  <p><strong>Transaction ID:</strong> {paymentDetails.transactionId}</p>
-                  <p><strong>Amount:</strong> {paymentDetails.amount}</p>
-                  <p><strong>Date:</strong> {paymentDetails.date}</p>
-                  <p><strong>Status:</strong> {paymentDetails.status}</p>
-                  <p><strong>Payment Method:</strong> {paymentDetails.paymentMethod}</p>
+                  <p>
+                    <strong>Transaction ID:</strong> {paymentDetails.transactionId}
+                  </p>
+                  <p>
+                    <strong>Amount:</strong> {paymentDetails.amount}
+                  </p>
+                  <p>
+                    <strong>Date:</strong> {paymentDetails.date}
+                  </p>
+                  <p>
+                    <strong>Status:</strong> {paymentDetails.status}
+                  </p>
+                  <p>
+                    <strong>Payment Method:</strong> {paymentDetails.paymentMethod}
+                  </p>
                 </div>
-                <button className="btn accent" onClick={handlePaymentOption}>Show Option</button>
+                <button className="btn accent" onClick={handlePaymentOption}>
+                  Show Option
+                </button>
               </div>
             )}
           </div>

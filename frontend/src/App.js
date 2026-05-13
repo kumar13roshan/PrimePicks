@@ -11,8 +11,14 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Suppliers from "./components/Suppliers";
 import Customers from "./components/Customers";
 import AdminDetails from "./components/AdminDetails";
+import SiteLayout from "./components/SiteLayout";
 
 
+const ProtectedPage = ({ children }) => (
+  <ProtectedRoute>
+    <SiteLayout>{children}</SiteLayout>
+  </ProtectedRoute>
+);
 
 const App = () => {
   return (
@@ -28,65 +34,65 @@ const App = () => {
         <Route
           path="/dashboard"
           element={(
-            <ProtectedRoute>
+            <ProtectedPage>
               <Dashboard />
-            </ProtectedRoute>
+            </ProtectedPage>
           )}
         /> {/* Add Dashboard Route */}
         <Route
           path="/purchase"
           element={(
-            <ProtectedRoute>
+            <ProtectedPage>
               <Purchase />
-            </ProtectedRoute>
+            </ProtectedPage>
           )}
         />
         <Route
           path="/sale"
           element={(
-            <ProtectedRoute>
+            <ProtectedPage>
               <Sale />
-            </ProtectedRoute>
+            </ProtectedPage>
           )}
         />
         <Route
           path="/transaction"
           element={(
-            <ProtectedRoute>
+            <ProtectedPage>
               <Transaction />
-            </ProtectedRoute>
+            </ProtectedPage>
           )}
         />
         <Route
           path="/stock"
           element={(
-            <ProtectedRoute>
+            <ProtectedPage>
               <Stock />
-            </ProtectedRoute>
+            </ProtectedPage>
           )}
         />
         <Route
           path="/suppliers"
           element={(
-            <ProtectedRoute>
+            <ProtectedPage>
               <Suppliers />
-            </ProtectedRoute>
+            </ProtectedPage>
           )}
         />
         <Route
           path="/customers"
           element={(
-            <ProtectedRoute>
+            <ProtectedPage>
               <Customers />
-            </ProtectedRoute>
+            </ProtectedPage>
           )}
         />
         <Route
           path="/admin-details"
           element={(
-            <ProtectedRoute>
+            <ProtectedPage>
               <AdminDetails />
-            </ProtectedRoute>
+            </ProtectedPage>
           )}
         />
       </Routes>

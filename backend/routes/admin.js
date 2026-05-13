@@ -1,5 +1,6 @@
 import express from "express";
 import AdminProfile from "../models/AdminProfile.js";
+import { ownerFilter } from "../utils/ownership.js";
 
 const router = express.Router();
 
@@ -20,7 +21,7 @@ router.get("/admin", async (req, res) => {
 
   try {
     const profile = await AdminProfile.findOne({
-      ownerId: req.user?.uid,
+      ...ownerFilter(req.user),
       email,
     });
     if (!profile) {
@@ -50,9 +51,16 @@ router.post("/admin", async (req, res) => {
   const normalizedShopName = String(shopName || "").trim();
   const normalizedGstNumber = String(gstNumber || "").trim();
   const normalizedAddress = String(address || "").trim();
-  const normalizedPhone = String(phone || "").trim();
+  const normalizedPhone = String(phone || "").replace(/\D/g, "");
 
-  if (!normalizedEmail || !normalizedName || !normalizedShopName || !normalizedGstNumber || !normalizedAddress) {
+  if (
+    !normalizedEmail ||
+    !normalizedName ||
+    !normalizedShopName ||
+    !normalizedGstNumber ||
+    !normalizedAddress ||
+    normalizedPhone.length !== 10
+  ) {
     return res.status(400).json({ message: "Missing required admin details" });
   }
 
@@ -61,8 +69,13 @@ router.post("/admin", async (req, res) => {
   }
 
   try {
+    const existing = await AdminProfile.findOne({
+      ...ownerFilter(req.user),
+      email: normalizedEmail,
+    });
+
     const profile = await AdminProfile.findOneAndUpdate(
-      { ownerId: req.user.uid },
+      existing ? { _id: existing._id } : { ownerId: req.user.uid },
       {
         ownerId: req.user?.uid,
         email: normalizedEmail,
@@ -85,7 +98,7 @@ router.post("/admin", async (req, res) => {
 // ✅ NEW: Delete route
 router.delete("/admin", async (req, res) => {
   try {
-    await AdminProfile.findOneAndDelete({ ownerId: req.user.uid });
+    await AdminProfile.findOneAndDelete(ownerFilter(req.user));
     return res.json({ message: "Admin profile deleted successfully" });
   } catch (err) {
     console.error("Delete admin profile error:", err.message);

@@ -4,6 +4,7 @@ import logo from "../assets/PrimePicks.png";
 import BackButton from "./BackButton";
 import { API_BASE } from "../utils/api";
 import { isAuthenticated, saveSession } from "../utils/auth";
+import { isValidPhone, normalizePhone } from "../utils/validation";
 
 const readJson = async (response) => {
   const contentType = response.headers.get("content-type") || "";
@@ -21,6 +22,10 @@ const Login = () => {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [shopName, setShopName] = useState("");
+  const [gstNumber, setGstNumber] = useState("");
+  const [address, setAddress] = useState("");
+  const [phone, setPhone] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -39,9 +44,16 @@ const Login = () => {
       return;
     }
 
-    if (mode === "signup" && !name.trim()) {
-      setErrorMessage("Name is required to create an account.");
-      return;
+    if (mode === "signup") {
+      if (!name.trim() || !shopName.trim() || !gstNumber.trim() || !address.trim()) {
+        setErrorMessage("Fill all required signup details.");
+        return;
+      }
+
+      if (!isValidPhone(phone)) {
+        setErrorMessage("Enter a 10 digit phone number.");
+        return;
+      }
     }
 
     setIsSubmitting(true);
@@ -57,6 +69,10 @@ const Login = () => {
           name: name.trim(),
           email: email.trim(),
           password,
+          shopName: shopName.trim(),
+          gstNumber: gstNumber.trim(),
+          address: address.trim(),
+          phone: normalizePhone(phone),
         }),
       });
 
@@ -129,14 +145,49 @@ const Login = () => {
           </div>
           <div className="stack">
             {isSignup && (
-              <input
-                type="text"
-                value={name}
-                onChange={(event) => setName(event.target.value)}
-                placeholder="Full Name"
-                className="input"
-                autoComplete="name"
-              />
+              <>
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Full Name *"
+                  className="input"
+                  autoComplete="name"
+                />
+                <input
+                  type="text"
+                  value={shopName}
+                  onChange={(event) => setShopName(event.target.value)}
+                  placeholder="Shop Name *"
+                  className="input"
+                  autoComplete="organization"
+                />
+                <input
+                  type="text"
+                  value={gstNumber}
+                  onChange={(event) => setGstNumber(event.target.value)}
+                  placeholder="GST Number *"
+                  className="input"
+                  autoComplete="off"
+                />
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={phone}
+                  onChange={(event) => setPhone(event.target.value)}
+                  placeholder="Phone Number * (10 digits)"
+                  className="input"
+                  autoComplete="tel"
+                />
+                <textarea
+                  value={address}
+                  onChange={(event) => setAddress(event.target.value)}
+                  placeholder="Address *"
+                  className="input"
+                  rows={3}
+                  autoComplete="street-address"
+                />
+              </>
             )}
             <input
               type="email"

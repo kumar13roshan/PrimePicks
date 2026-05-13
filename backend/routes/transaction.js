@@ -1,12 +1,13 @@
 import express from "express";
 import Transaction from "../models/Transaction.js";
 import OpeningBalance from "../models/OpeningBalance.js";
+import { ownerFilter } from "../utils/ownership.js";
 
 const router = express.Router();
 
 router.get("/transaction/opening", async (req, res) => {
   try {
-    const balance = await OpeningBalance.findOne({ ownerId: req.user.uid });
+    const balance = await OpeningBalance.findOne(ownerFilter(req.user));
     if (!balance) {
       return res.json({ cash: 0, online: 0 });
     }
@@ -25,8 +26,9 @@ router.post("/transaction/opening", async (req, res) => {
   }
 
   try {
+    const existing = await OpeningBalance.findOne(ownerFilter(req.user));
     const balance = await OpeningBalance.findOneAndUpdate(
-      { ownerId: req.user.uid },
+      existing ? { _id: existing._id } : { ownerId: req.user.uid },
       { ownerId: req.user.uid, cash, online },
       { new: true, upsert: true, setDefaultsOnInsert: true }
     );
@@ -54,7 +56,7 @@ router.post("/transaction", async (req, res) => {
 
 router.get("/transaction", async (req, res) => {
   try {
-    const transactions = await Transaction.find({ ownerId: req.user.uid }).sort({ date: -1 });
+    const transactions = await Transaction.find(ownerFilter(req.user)).sort({ date: -1 });
     res.json(transactions);
   } catch (err) {
     res.status(500).json({ message: "Failed to load transactions" });

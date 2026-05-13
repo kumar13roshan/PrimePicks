@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import ProfileMenu from "./ProfileMenu";
 import { apiFetch } from "../utils/api";
 import { getCurrentUser, subscribeToSession } from "../utils/auth";
+import { isValidPhone, normalizePhone } from "../utils/validation";
 
 const normalizeEmail = (value) => String(value || "").trim().toLowerCase();
 
@@ -33,9 +33,9 @@ const AdminDetails = () => {
   const [email, setEmail] = useState(() => normalizeEmail(getCurrentUser()?.email));
   const [form, setForm] = useState(() => buildEmptyForm(getCurrentUser()?.name || ""));
   const [savedProfile, setSavedProfile] = useState(null);
+  const [showForm, setShowForm] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [successMessage, setSuccessMessage] = useState("");
 
@@ -66,6 +66,7 @@ const AdminDetails = () => {
       setErrorMessage("");
       setSavedProfile(null);
       setForm(buildEmptyForm(user.name || ""));
+      setShowForm(true);
 
       try {
         const res = await apiFetch(`/admin?email=${encodeURIComponent(normalizeEmail(user.email))}`, {
@@ -76,18 +77,21 @@ const AdminDetails = () => {
           const data = await readJson(res);
           if (!active) return;
           setSavedProfile(data);
-setForm({
-  name: data.name || user.name || "",
-  shopName: data.shopName || "",
-  gstNumber: data.gstNumber || "",
-  address: data.address || "",
-  phone: data.phone || "",
-});
+          setShowForm(false);
+          setForm({
+            name: data.name || user.name || "",
+            shopName: data.shopName || "",
+            gstNumber: data.gstNumber || "",
+            address: data.address || "",
+            phone: data.phone || "",
+          });
         } else if (res.status !== 404) {
           const data = await readJson(res);
           if (active) {
             setErrorMessage(data.message || "Unable to load admin details.");
           }
+        } else if (active) {
+          setShowForm(true);
         }
       } catch (err) {
         if (err?.name !== "AbortError" && active) {
@@ -127,6 +131,11 @@ setForm({
       return;
     }
 
+    if (!isValidPhone(form.phone)) {
+      setErrorMessage("Enter a 10 digit phone number.");
+      return;
+    }
+
     setSaving(true);
 
     try {
@@ -138,7 +147,7 @@ setForm({
           shopName: form.shopName.trim(),
           gstNumber: form.gstNumber.trim(),
           address: form.address.trim(),
-          phone: form.phone.trim(),
+          phone: normalizePhone(form.phone),
         }),
       });
 
@@ -149,7 +158,14 @@ setForm({
 
       setSavedProfile(data);
       // ✅ Save ke baad form empty karo
-      setForm(buildEmptyForm(""));
+      setForm({
+        name: data.name || "",
+        shopName: data.shopName || "",
+        gstNumber: data.gstNumber || "",
+        address: data.address || "",
+        phone: data.phone || "",
+      });
+      setShowForm(false);
       setSuccessMessage("Admin details saved successfully!");
     } catch (err) {
       setErrorMessage(err.message || "Failed to save admin details.");
@@ -159,31 +175,17 @@ setForm({
   };
 
   // ✅ NEW: Delete handler
-  const handleDelete = async () => {
-    if (!window.confirm("Are You Sure!! This will delete your details permanently.")) {
-      return;
-    }
-
+  const handleEditProfile = () => {
     setErrorMessage("");
     setSuccessMessage("");
-    setDeleting(true);
-
-    try {
-      const res = await apiFetch("/admin", { method: "DELETE" });
-      const data = await readJson(res);
-
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to delete admin profile");
-      }
-
-      setSavedProfile(null);
-      setForm(buildEmptyForm(""));
-      setSuccessMessage("Admin profile deleted successfully!");
-    } catch (err) {
-      setErrorMessage(err.message || "Failed to delete admin profile.");
-    } finally {
-      setDeleting(false);
-    }
+    setForm({
+      name: savedProfile?.name || user?.name || "",
+      shopName: savedProfile?.shopName || "",
+      gstNumber: savedProfile?.gstNumber || "",
+      address: savedProfile?.address || "",
+      phone: savedProfile?.phone || "",
+    });
+    setShowForm(true);
   };
 
   return (
@@ -192,14 +194,11 @@ setForm({
         <div>
           <p className="kicker">Admin</p>
           <h1>Store Profile</h1>
-          <p className="subtitle">Add the details that will appear on invoices and reports.</p>
+          <p className="subtitle">Manage the details that will appear on invoices and reports.</p>
         </div>
-        <div className="row">
-          <button type="button" className="btn ghost" onClick={() => navigate("/dashboard")}>
-            Back to Dashboard
-          </button>
-          <ProfileMenu />
-        </div>
+        <button type="button" className="btn ghost" onClick={() => navigate("/dashboard")}>
+          Back to Dashboard
+        </button>
       </div>
 
       <div className="card">
@@ -214,11 +213,11 @@ setForm({
                   {/* ✅ Delete button */}
                   <button
                     type="button"
-                    className="btn danger"
-                    onClick={handleDelete}
-                    disabled={deleting}
+                    className="btn primary"
+                    onClick={handleEditProfile}
+                    disabled={showForm || saving}
                   >
-                    {deleting ? "Deleting..." : "Delete Profile"}
+                    Edit Details
                   </button>
                 </div>
                 <div className="grid two">
@@ -245,72 +244,76 @@ setForm({
                 </div>
               </div>
             )}
-            <div className="grid two">
-              <label className="field">
-                <span>Email</span>
-                <input className="input" value={email} readOnly />
-              </label>
-              <label className="field">
-                <span>Full Name *</span>
-                <input
-                  autoComplete="name"
-                  className="input"
-                  disabled={loading || saving}
-                  value={form.name}
-                  onChange={handleChange("name")}
-                  placeholder="Your name"
-                  required
-                />
-              </label>
-              <label className="field">
-                <span>Shop Name *</span>
-                <input
-                  autoComplete="organization"
-                  className="input"
-                  disabled={loading || saving}
-                  value={form.shopName}
-                  onChange={handleChange("shopName")}
-                  placeholder="Shop or business name"
-                  required
-                />
-              </label>
-              <label className="field">
-                <span>GST Number *</span>
-                <input
-                  autoComplete="off"
-                  className="input"
-                  disabled={loading || saving}
-                  value={form.gstNumber}
-                  onChange={handleChange("gstNumber")}
-                  placeholder="GSTIN"
-                  required
-                />
-              </label>
-              <label className="field">
-                <span>Phone</span>
-                <input
-                  autoComplete="tel"
-                  className="input"
-                  disabled={loading || saving}
-                  value={form.phone}
-                  onChange={handleChange("phone")}
-                  placeholder="Contact number"
-                />
-              </label>
-            </div>
-            <label className="field">
-              <span>Address *</span>
-              <textarea
-                autoComplete="street-address"
-                className="input"
-                disabled={loading || saving}
-                rows="3"
-                value={form.address}
-                onChange={handleChange("address")}
-                placeholder="Street, area, city, state, pincode"
-                required
-              />
-            </label>
+            {showForm ? (
+              <>
+                <div className="grid two">
+                  <label className="field">
+                    <span>Email</span>
+                    <input className="input" value={email} readOnly />
+                  </label>
+                  <label className="field">
+                    <span>Full Name *</span>
+                    <input
+                      autoComplete="name"
+                      className="input"
+                      disabled={loading || saving}
+                      value={form.name}
+                      onChange={handleChange("name")}
+                      placeholder="Your name"
+                      required
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Shop Name *</span>
+                    <input
+                      autoComplete="organization"
+                      className="input"
+                      disabled={loading || saving}
+                      value={form.shopName}
+                      onChange={handleChange("shopName")}
+                      placeholder="Shop or business name"
+                      required
+                    />
+                  </label>
+                  <label className="field">
+                    <span>GST Number *</span>
+                    <input
+                      autoComplete="off"
+                      className="input"
+                      disabled={loading || saving}
+                      value={form.gstNumber}
+                      onChange={handleChange("gstNumber")}
+                      placeholder="GSTIN"
+                      required
+                    />
+                  </label>
+                  <label className="field">
+                    <span>Phone *</span>
+                    <input
+                      autoComplete="tel"
+                      className="input"
+                      disabled={loading || saving}
+                      value={form.phone}
+                      onChange={handleChange("phone")}
+                      placeholder="Contact number"
+                    />
+                  </label>
+                </div>
+                <label className="field">
+                  <span>Address *</span>
+                  <textarea
+                    autoComplete="street-address"
+                    className="input"
+                    disabled={loading || saving}
+                    rows="3"
+                    value={form.address}
+                    onChange={handleChange("address")}
+                    placeholder="Street, area, city, state, pincode"
+                    required
+                  />
+                </label>
+              </>
+            ) : null}
 
             {successMessage && (
               <p className="auth-success" aria-live="polite" style={{ color: "green" }}>
@@ -323,11 +326,18 @@ setForm({
               </p>
             )}
 
-            <div className="row">
-              <button type="submit" className="btn primary" disabled={saving || deleting}>
-                {saving ? "Saving..." : "Save Details"}
-              </button>
-            </div>
+            {showForm && (
+              <div className="row">
+                <button type="submit" className="btn primary" disabled={saving}>
+                  {saving ? "Saving..." : "Save Details"}
+                </button>
+                {savedProfile && (
+                  <button type="button" className="btn ghost" onClick={() => setShowForm(false)} disabled={saving}>
+                    Cancel
+                  </button>
+                )}
+              </div>
+            )}
           </form>
         )}
       </div>

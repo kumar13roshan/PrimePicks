@@ -1,12 +1,13 @@
 import express from "express";
 import mongoose from "mongoose";
 import Stock from "../models/Stock.js";
+import { ownerFilter } from "../utils/ownership.js";
 
 const router = express.Router();
 
 router.get("/stock", async (req, res) => {
   try {
-    const items = await Stock.find({ ownerId: req.user.uid }).sort({ itemName: 1 });
+    const items = await Stock.find(ownerFilter(req.user)).sort({ itemName: 1 });
     res.json(items);
   } catch (err) {
     res.status(500).json({ message: "Failed to load stock" });
@@ -25,7 +26,7 @@ router.post("/stock/opening", async (req, res) => {
   }
 
   try {
-    const existing = await Stock.findOne({ ownerId, itemName: name });
+    const existing = await Stock.findOne({ itemName: name, ...ownerFilter(req.user) });
 
     if (!existing) {
       if (!Number.isFinite(unitPrice) || unitPrice < 0) {
@@ -67,8 +68,8 @@ router.post("/stock/opening", async (req, res) => {
     }
 
     const stock = await Stock.findOneAndUpdate(
-      { _id: existing._id, ownerId },
-      { $inc: { quantity: delta }, $set: updates },
+      { _id: existing._id },
+      { $inc: { quantity: delta }, $set: { ...updates, ownerId } },
       { new: true }
     );
 
@@ -85,11 +86,11 @@ router.delete("/stock/:id", async (req, res) => {
     let deleted = null;
 
     if (mongoose.Types.ObjectId.isValid(id)) {
-      deleted = await Stock.findOneAndDelete({ _id: id, ownerId });
+      deleted = await Stock.findOneAndDelete({ _id: id, ...ownerFilter(req.user) });
     }
 
     if (!deleted) {
-      deleted = await Stock.findOneAndDelete({ itemName: id, ownerId });
+      deleted = await Stock.findOneAndDelete({ itemName: id, ...ownerFilter(req.user) });
     }
 
     if (!deleted) {

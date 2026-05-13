@@ -1,6 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
-import BackButton from "./BackButton";
-import ProfileMenu from "./ProfileMenu";
+import React, { useState } from "react";
 import { apiFetch } from "../utils/api";
 import { hasAtSymbol, isValidPhone, normalizeEmail, normalizePhone } from "../utils/validation";
 
@@ -11,48 +9,90 @@ const unitOptions = [
   { value: "kg", label: "Kilograms (kg)" },
 ];
 
+const emptyForm = () => ({
+  itemName: "",
+  itemPrice: "",
+  quantity: "",
+  unit: "pcs",
+  supplierName: "",
+  supplierPhone: "",
+  supplierGstNumber: "",
+  supplierEmail: "",
+  supplierAddress: "",
+  invoiceNumber: "",
+  purchaseDate: initialDate,
+  notes: "",
+});
+
 const PurchaseEntry = () => {
-  const [form, setForm] = useState({
-    itemName: '',
-    itemPrice: '',
-    quantity: '',
-    unit: 'pcs',
-    supplierName: '',
-    supplierPhone: '',
-    supplierGstNumber: '',
-    supplierEmail: '',
-    supplierAddress: '',
-    invoiceNumber: '',
-    purchaseDate: initialDate,
-    notes: '',
-  });
+  const [form, setForm] = useState(emptyForm);
+  const [purchaseItems, setPurchaseItems] = useState([]);
 
-  const [purchases, setPurchases] = useState([]);
+  const currentAmount = Number(form.itemPrice || 0) * Number(form.quantity || 0);
+  const draftTotal = purchaseItems.reduce((sum, item) => sum + item.totalPrice, 0);
 
-  const loadPurchases = useCallback(async () => {
-    try {
-      const res = await apiFetch("/purchase");
-      if (!res.ok) {
-        throw new Error("Failed to load purchases");
-      }
-      const data = await res.json();
-      setPurchases(data);
-    } catch (err) {
-      console.log("Error fetching purchases:", err);
+  const updateForm = (field) => (event) => {
+    setForm((prev) => ({ ...prev, [field]: event.target.value }));
+  };
+
+  const resetItemFields = () => {
+    setForm((prev) => ({
+      ...prev,
+      itemName: "",
+      itemPrice: "",
+      quantity: "",
+      unit: "pcs",
+    }));
+  };
+
+  const addItemToPurchase = () => {
+    const price = Number(form.itemPrice);
+    const quantity = Number(form.quantity);
+
+    if (!form.itemName || !Number.isFinite(price) || price < 0 || !Number.isFinite(quantity) || quantity <= 0 || !form.unit) {
+      return alert("Enter valid item details");
     }
-  }, []);
 
-  useEffect(() => {
-    loadPurchases();
-  }, [loadPurchases]);
+    setPurchaseItems((prev) => [
+      ...prev,
+      {
+        itemName: form.itemName.trim(),
+        price,
+        quantity,
+        unit: form.unit,
+        totalPrice: price * quantity,
+      },
+    ]);
+    resetItemFields();
+  };
+
+  const removePurchaseItem = (index) => {
+    setPurchaseItems((prev) => prev.filter((_, itemIndex) => itemIndex !== index));
+  };
 
   const handleAddPurchase = async () => {
     const trimmedSupplierName = String(form.supplierName || "").trim();
     const trimmedSupplierEmail = String(form.supplierEmail || "").trim();
     const normalizedSupplierPhone = normalizePhone(form.supplierPhone);
+    const itemsToSave = [...purchaseItems];
 
-    if (!form.itemName || !form.itemPrice || !form.quantity || !form.unit || !trimmedSupplierName || !normalizedSupplierPhone || !form.purchaseDate) {
-      return alert("Fill all required fields");
+    if (form.itemName || form.itemPrice || form.quantity) {
+      const price = Number(form.itemPrice);
+      const quantity = Number(form.quantity);
+      if (!form.itemName || !Number.isFinite(price) || price < 0 || !Number.isFinite(quantity) || quantity <= 0 || !form.unit) {
+        return alert("Complete the current item details or add it to the list first.");
+      }
+      itemsToSave.push({
+        itemName: form.itemName.trim(),
+        price,
+        quantity,
+        unit: form.unit,
+        totalPrice: price * quantity,
+      });
+    }
+
+    if (!trimmedSupplierName || !normalizedSupplierPhone || !form.purchaseDate || itemsToSave.length === 0) {
+      return alert("Enter supplier details and add at least one item");
     }
 
     if (!isValidPhone(form.supplierPhone)) {
@@ -64,298 +104,211 @@ const PurchaseEntry = () => {
     }
 
     try {
-      const res = await apiFetch("/purchase", {
-        method: "POST",
-        body: JSON.stringify({
-          itemName: form.itemName,
-          price: Number(form.itemPrice),
-          quantity: Number(form.quantity),
-          unit: form.unit,
-          supplierName: trimmedSupplierName,
-          supplierPhone: normalizedSupplierPhone,
-          supplierGstNumber: form.supplierGstNumber,
-          supplierEmail: trimmedSupplierEmail ? normalizeEmail(trimmedSupplierEmail) : "",
-          supplierAddress: form.supplierAddress,
-          invoiceNumber: form.invoiceNumber,
-          purchaseDate: form.purchaseDate,
-          notes: form.notes,
-        }),
-      });
+      for (const item of itemsToSave) {
+        const res = await apiFetch("/purchase", {
+          method: "POST",
+          body: JSON.stringify({
+            itemName: item.itemName,
+            price: item.price,
+            quantity: item.quantity,
+            unit: item.unit,
+            supplierName: trimmedSupplierName,
+            supplierPhone: normalizedSupplierPhone,
+            supplierGstNumber: form.supplierGstNumber,
+            supplierEmail: trimmedSupplierEmail ? normalizeEmail(trimmedSupplierEmail) : "",
+            supplierAddress: form.supplierAddress,
+            invoiceNumber: form.invoiceNumber,
+            purchaseDate: form.purchaseDate,
+            notes: form.notes,
+          }),
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      if (!res.ok) {
-        return alert(data.message || "Failed to add purchase");
+        if (!res.ok) {
+          return alert(data.message || "Failed to add purchase");
+        }
       }
 
-      await loadPurchases();
-      setForm({
-        itemName: '',
-        itemPrice: '',
-        quantity: '',
-        unit: 'pcs',
-        supplierName: '',
-        supplierPhone: '',
-        supplierGstNumber: '',
-        supplierEmail: '',
-        supplierAddress: '',
-        invoiceNumber: '',
-        purchaseDate: initialDate,
-        notes: '',
-      });
+      setForm(emptyForm());
+      setPurchaseItems([]);
+      alert("Purchase saved successfully.");
     } catch (err) {
       alert("Unable to reach the backend. Check that the server is running and the API URL is correct.");
     }
   };
 
-  const deletePurchase = async (id) => {
-    try {
-      const res = await apiFetch(`/purchase/${id}`, { method: "DELETE" });
-      let data = {};
-      try {
-        data = await res.json();
-      } catch (err) {
-        data = {};
-      }
-      if (!res.ok) {
-        return alert(data.message || "Failed to delete purchase");
-      }
-      await loadPurchases();
-    } catch (err) {
-      alert("Unable to reach the backend. Check that the server is running.");
-    }
-  };
-
-  const formatDate = (value) => {
-    if (!value) return "-";
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return value;
-    return date.toLocaleDateString();
-  };
-
-  const csvEscape = (value) => {
-    const safe = value === null || value === undefined ? "" : String(value);
-    return `"${safe.replace(/"/g, '""')}"`;
-  };
-
-  const downloadCSV = () => {
-    if (!purchases.length) return alert("No purchases to download");
-
-    const headers = [
-      "Item Name",
-      "Quantity",
-      "Unit",
-      "Price",
-      "Supplier Name",
-      "Supplier Phone",
-      "Supplier GST Number",
-      "Supplier Email",
-      "Supplier Address",
-      "Invoice Number",
-      "Purchase Date",
-      "Notes",
-      "Record Created",
-    ];
-
-    const rows = purchases.map((p) => [
-      p.itemName,
-      p.quantity,
-      p.unit || "pcs",
-      p.price,
-      p.supplierName,
-      p.supplierPhone,
-      p.supplierGstNumber,
-      p.supplierEmail,
-      p.supplierAddress,
-      p.invoiceNumber,
-      formatDate(p.purchaseDate || p.date),
-      p.notes,
-      formatDate(p.date),
-    ]);
-
-    const csv = [headers, ...rows]
-      .map((row) => row.map(csvEscape).join(","))
-      .join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `purchases_${new Date().toISOString().slice(0, 10)}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  };
+  const formatCurrency = (value) => `Rs ${Number(value || 0).toLocaleString()}`;
 
   return (
     <div className="page full fill">
-      <div className="topbar">
-        <BackButton />
-        <ProfileMenu />
-      </div>
       <div className="page-header">
         <div>
           <p className="kicker">Purchases</p>
           <h1>Record new inventory</h1>
-          <p className="subtitle">Capture supplier details, quantities, and dates in one place.</p>
-        </div>
-        <div className="row">
-          <span className="badge accent">{purchases.length} total entries</span>
-          <button className="btn ghost" onClick={downloadCSV}>Download CSV</button>
+          <p className="subtitle">Add purchased items here. Purchase history is available in Suppliers.</p>
         </div>
       </div>
 
-      <div className="grid two">
-        <div className="card glow stack">
+      <div className="purchase-entry-layout">
+        <div className="card glow stack purchase-form-card">
           <div className="card-header">
             <div>
               <h2>New Purchase</h2>
-              <p className="subtitle">Minimal steps. Maximum clarity.</p>
+              <p className="subtitle">Supplier, item, and invoice details.</p>
             </div>
-            <span className="badge">Required *</span>
+            <span className="badge accent">{formatCurrency(draftTotal + currentAmount)}</span>
           </div>
+
           <div className="stepper">
             <span className="step active">1 Supplier</span>
             <span className="step active">2 Item</span>
             <span className="step active">3 Invoice</span>
           </div>
-          <div className="stack">
-            <span className="section-label">Supplier Details</span>
-            <input
-              placeholder="Supplier Name *"
-              value={form.supplierName}
-              onChange={(e) => setForm({ ...form, supplierName: e.target.value })}
-              className="input"
-            />
-            <div className="row">
-              <input
-                placeholder="Supplier Phone * (10 digits)"
-                type="tel"
-                inputMode="numeric"
-                value={form.supplierPhone}
-                onChange={(e) => setForm({ ...form, supplierPhone: e.target.value })}
-                className="input"
-              />
-              <input
-                placeholder="Supplier GST Number"
-                value={form.supplierGstNumber}
-                onChange={(e) => setForm({ ...form, supplierGstNumber: e.target.value })}
-                className="input"
-              />
-            </div>
-            <input
-              placeholder="Supplier Email"
-              type="email"
-              value={form.supplierEmail}
-              onChange={(e) => setForm({ ...form, supplierEmail: e.target.value })}
-              className="input"
-            />
-            <input
-              placeholder="Supplier Address"
-              value={form.supplierAddress}
-              onChange={(e) => setForm({ ...form, supplierAddress: e.target.value })}
-              className="input"
-            />
 
-            <span className="section-label">Item Details</span>
-            <input
-              placeholder="Item Name *"
-              value={form.itemName}
-              onChange={(e) => setForm({ ...form, itemName: e.target.value })}
-              className="input"
-            />
-            <div className="row">
+          <div className="purchase-form-grid">
+            <section className="form-section">
+              <div className="section-heading">
+                <span className="section-label">Supplier Details</span>
+                <span className="badge">Required</span>
+              </div>
               <input
-                placeholder="Item Price *"
-                type="number"
-                value={form.itemPrice}
-                onChange={(e) => setForm({ ...form, itemPrice: e.target.value })}
+                placeholder="Supplier Name *"
+                value={form.supplierName}
+                onChange={updateForm("supplierName")}
+                className="input"
+              />
+              <div className="field-grid two-fields">
+                <input
+                  placeholder="Supplier Phone * (10 digits)"
+                  type="tel"
+                  inputMode="numeric"
+                  value={form.supplierPhone}
+                  onChange={updateForm("supplierPhone")}
+                  className="input"
+                />
+                <input
+                  placeholder="Supplier GST Number"
+                  value={form.supplierGstNumber}
+                  onChange={updateForm("supplierGstNumber")}
+                  className="input"
+                />
+              </div>
+              <input
+                placeholder="Supplier Email"
+                type="email"
+                value={form.supplierEmail}
+                onChange={updateForm("supplierEmail")}
                 className="input"
               />
               <input
-                placeholder="Quantity *"
-                type="number"
-                value={form.quantity}
-                onChange={(e) => setForm({ ...form, quantity: e.target.value })}
+                placeholder="Supplier Address"
+                value={form.supplierAddress}
+                onChange={updateForm("supplierAddress")}
                 className="input"
               />
-              <select
-                value={form.unit}
-                onChange={(e) => setForm({ ...form, unit: e.target.value })}
-                className="select"
-              >
-                {unitOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            </section>
 
-            <span className="section-label">Invoice & Notes</span>
-            <div className="row">
+            <section className="form-section">
+              <div className="section-heading">
+                <span className="section-label">Item Details</span>
+                <span className="badge">Stock</span>
+              </div>
               <input
-                placeholder="Invoice Number"
-                value={form.invoiceNumber}
-                onChange={(e) => setForm({ ...form, invoiceNumber: e.target.value })}
+                placeholder="Item Name *"
+                value={form.itemName}
+                onChange={updateForm("itemName")}
                 className="input"
               />
-              <input
-                type="date"
-                value={form.purchaseDate}
-                onChange={(e) => setForm({ ...form, purchaseDate: e.target.value })}
-                className="input"
-              />
-            </div>
-            <textarea
-              placeholder="Notes"
-              value={form.notes}
-              onChange={(e) => setForm({ ...form, notes: e.target.value })}
-              className="input"
-              rows={3}
-            />
-            <button onClick={handleAddPurchase} className="btn primary">Add Purchase</button>
-          </div>
-        </div>
+              <div className="field-grid three-fields">
+                <input
+                  placeholder="Item Price *"
+                  type="number"
+                  value={form.itemPrice}
+                  onChange={updateForm("itemPrice")}
+                  className="input"
+                />
+                <input
+                  placeholder="Quantity *"
+                  type="number"
+                  value={form.quantity}
+                  onChange={updateForm("quantity")}
+                  className="input"
+                />
+                <select value={form.unit} onChange={updateForm("unit")} className="select">
+                  {unitOptions.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button type="button" onClick={addItemToPurchase} className="btn ghost">
+                Add Item
+              </button>
+            </section>
 
-        <div className="card scroll-card">
-          <div className="card-header">
-            <h2>Purchase List</h2>
-            <span className="badge">Latest first</span>
-          </div>
-          {purchases.length === 0 ? (
-            <p className="subtitle">No purchases found</p>
-          ) : (
-            <div className="stack scroll-panel">
-              {purchases.map((p) => (
-                <div key={p._id} className="card" style={{ padding: 14 }}>
-                  <div className="row" style={{ justifyContent: "space-between", alignItems: "flex-start" }}>
-                    <div className="stack sm">
-                      <strong>{p.itemName}</strong>
-                      <p className="subtitle">{p.quantity} {p.unit || "pcs"} · ₹{p.price}</p>
-                      <p className="subtitle">
-                        Supplier: {([p.supplierName, p.supplierPhone].filter(Boolean).join(" · ")) || "-"}
-                      </p>
-                      {p.supplierGstNumber && <p className="subtitle">GST: {p.supplierGstNumber}</p>}
-                      {p.supplierEmail && <p className="subtitle">Email: {p.supplierEmail}</p>}
-                      {p.supplierAddress && <p className="subtitle">Address: {p.supplierAddress}</p>}
-                      {p.invoiceNumber && <p className="subtitle">Invoice: {p.invoiceNumber}</p>}
-                      <p className="subtitle">Purchase Date: {formatDate(p.purchaseDate || p.date)}</p>
-                      {p.notes && <p className="subtitle">Notes: {p.notes}</p>}
-                    </div>
-                    <button
-                      onClick={() => deletePurchase(p._id)}
-                      className="btn danger"
-                    >
-                      Delete
-                    </button>
-                  </div>
+            <section className="form-section">
+              <div className="section-heading">
+                <span className="section-label">Invoice & Notes</span>
+                <span className="badge">Optional</span>
+              </div>
+              <div className="field-grid two-fields">
+                <input
+                  placeholder="Invoice Number"
+                  value={form.invoiceNumber}
+                  onChange={updateForm("invoiceNumber")}
+                  className="input"
+                />
+                <input
+                  type="date"
+                  value={form.purchaseDate}
+                  onChange={updateForm("purchaseDate")}
+                  className="input"
+                />
+              </div>
+              <textarea
+                placeholder="Notes"
+                value={form.notes}
+                onChange={updateForm("notes")}
+                className="input"
+                rows={3}
+              />
+            </section>
+
+            {purchaseItems.length > 0 && (
+              <section className="form-section">
+                <div className="section-heading">
+                  <span className="section-label">Items in this purchase</span>
+                  <span className="badge accent">{purchaseItems.length} items</span>
                 </div>
-              ))}
-            </div>
-          )}
+                <div className="draft-items">
+                  {purchaseItems.map((item, index) => (
+                    <div key={`${item.itemName}-${index}`} className="draft-item">
+                      <div>
+                        <strong>{item.itemName}</strong>
+                        <span>
+                          {item.quantity} {item.unit} at {formatCurrency(item.price)}
+                        </span>
+                      </div>
+                      <div className="row">
+                        <strong>{formatCurrency(item.totalPrice)}</strong>
+                        <button type="button" className="btn danger" onClick={() => removePurchaseItem(index)}>
+                          Remove
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <button onClick={handleAddPurchase} className="btn primary purchase-submit">
+              Save Purchase
+            </button>
+          </div>
         </div>
+
       </div>
     </div>
   );

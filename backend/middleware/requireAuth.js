@@ -18,6 +18,7 @@ const requireAuth = (req, res, next) => {
       uid: decoded.sub,
       email: decoded.email,
       name: decoded.name || "",
+      legacyOwnerIds: Array.isArray(decoded.legacyOwnerIds) ? decoded.legacyOwnerIds : [],
     };
     return next();
   } catch (error) {

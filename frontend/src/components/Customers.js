@@ -1,6 +1,4 @@
 import React, { useEffect, useMemo, useState } from "react";
-import BackButton from "./BackButton";
-import ProfileMenu from "./ProfileMenu";
 import { apiFetch } from "../utils/api";
 import { normalizeEmail, normalizeNameKey, normalizePhone } from "../utils/validation";
 
@@ -8,26 +6,27 @@ const Customers = () => {
   const [sales, setSales] = useState([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(true);
+  const [deletingKey, setDeletingKey] = useState("");
   const [errorMessage, setErrorMessage] = useState("");
 
-  useEffect(() => {
-    const fetchSales = async () => {
-      setLoading(true);
-      setErrorMessage("");
-      try {
-        const res = await apiFetch("/sale");
-        if (!res.ok) {
-          throw new Error("Failed to load sales");
-        }
-        const data = await res.json();
-        setSales(data);
-      } catch (err) {
-        setErrorMessage("Unable to load customers.");
-      } finally {
-        setLoading(false);
+  const fetchSales = async () => {
+    setLoading(true);
+    setErrorMessage("");
+    try {
+      const res = await apiFetch("/sale");
+      if (!res.ok) {
+        throw new Error("Failed to load sales");
       }
-    };
+      const data = await res.json();
+      setSales(data);
+    } catch (err) {
+      setErrorMessage("Unable to load customers.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchSales();
   }, []);
 
@@ -37,15 +36,16 @@ const Customers = () => {
       const name = sale.customerName || "Unknown Customer";
       const phone = sale.customerPhone || "";
       const email = sale.customerEmail || "";
-      const key = [normalizeNameKey(name), normalizePhone(phone), normalizeEmail(email)]
-        .filter(Boolean)
-        .join("|") || sale._id;
+      const key =
+        [normalizeNameKey(name), normalizePhone(phone), normalizeEmail(email)].filter(Boolean).join("|") ||
+        sale._id;
 
       const amount = Number(sale.price || 0) * Number(sale.quantity || 0);
       const dateValue = sale.saleDate || sale.date;
 
       if (!map.has(key)) {
         map.set(key, {
+          key,
           name,
           phone: normalizePhone(phone) || phone,
           email: normalizeEmail(email) || email,
@@ -54,12 +54,16 @@ const Customers = () => {
           totalQuantity: 0,
           lastDate: dateValue,
           invoices: new Set(),
+          saleIds: [],
         });
       }
 
       const entry = map.get(key);
       entry.totalAmount += amount;
       entry.totalQuantity += Number(sale.quantity || 0);
+      if (sale._id) {
+        entry.saleIds.push(sale._id);
+      }
       if (sale.invoiceNumber) {
         entry.invoices.add(sale.invoiceNumber);
       }
@@ -83,6 +87,19 @@ const Customers = () => {
         .some((value) => value.toLowerCase().includes(q))
     );
   }, [query, customers]);
+
+  const totals = useMemo(
+    () =>
+      filteredCustomers.reduce(
+        (summary, customer) => ({
+          totalAmount: summary.totalAmount + customer.totalAmount,
+          totalQuantity: summary.totalQuantity + customer.totalQuantity,
+          invoiceCount: summary.invoiceCount + customer.invoices.size,
+        }),
+        { totalAmount: 0, totalQuantity: 0, invoiceCount: 0 }
+      ),
+    [filteredCustomers]
+  );
 
   const formatDate = (value) => {
     if (!value) return "-";
@@ -121,9 +138,7 @@ const Customers = () => {
       Array.from(customer.invoices).join(" | "),
     ]);
 
-    const csv = [headers, ...rows]
-      .map((row) => row.map(csvEscape).join(","))
-      .join("\n");
+    const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
 
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
@@ -136,12 +151,35 @@ const Customers = () => {
     URL.revokeObjectURL(url);
   };
 
+  const deleteCustomer = async (customer) => {
+    if (!window.confirm(`Delete ${customer.name} and all related sale details?`)) {
+      return;
+    }
+
+    setDeletingKey(customer.key);
+    try {
+      for (const id of customer.saleIds) {
+        const res = await apiFetch(`/sale/${id}`, { method: "DELETE" });
+        let data = {};
+        try {
+          data = await res.json();
+        } catch (err) {
+          data = {};
+        }
+        if (!res.ok) {
+          throw new Error(data.message || "Failed to delete customer sales");
+        }
+      }
+      await fetchSales();
+    } catch (err) {
+      alert(err.message || "Failed to delete customer.");
+    } finally {
+      setDeletingKey("");
+    }
+  };
+
   return (
     <div className="page full fill">
-      <div className="topbar">
-        <BackButton />
-        <ProfileMenu />
-      </div>
       <div className="page-header">
         <div>
           <p className="kicker">Customers</p>
@@ -155,7 +193,9 @@ const Customers = () => {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button className="btn ghost" onClick={downloadCSV}>Download CSV</button>
+          <button className="btn ghost" onClick={downloadCSV}>
+            Download CSV
+          </button>
         </div>
       </div>
 
@@ -165,27 +205,75 @@ const Customers = () => {
           <span className="badge">{filteredCustomers.length} records</span>
         </div>
 
-      {loading ? (
+        {loading ? (
           <p className="subtitle">Loading customers...</p>
         ) : errorMessage ? (
           <p className="subtitle">{errorMessage}</p>
         ) : filteredCustomers.length === 0 ? (
           <p className="subtitle">No customers found</p>
         ) : (
-          <div className="stack scroll-panel">
-            {filteredCustomers.map((customer, index) => (
-              <div key={`${customer.name}-${index}`} className="card" style={{ padding: 14 }}>
-                <div className="stack sm">
-                  <strong>{customer.name}</strong>
-                  <p className="subtitle">Phone: {customer.phone || "-"}</p>
-                  <p className="subtitle">Email: {customer.email || "-"}</p>
-                  <p className="subtitle">Address: {customer.address || "-"}</p>
-                  <p className="subtitle">Total Spent: ₹{customer.totalAmount.toLocaleString()}</p>
-                  <p className="subtitle">Invoices: {Array.from(customer.invoices).join(", ") || "-"}</p>
-                  <p className="subtitle">Last Sale: {formatDate(customer.lastDate)}</p>
-                </div>
-              </div>
-            ))}
+          <div className="scroll-panel">
+            <table className="table sheet-table">
+              <thead>
+                <tr>
+                  <th>#</th>
+                  <th>Customer Name</th>
+                  <th>Phone</th>
+                  <th>Email</th>
+                  <th>Address</th>
+                  <th>Total Spent</th>
+                  <th>Total Qty</th>
+                  <th>Invoices</th>
+                  <th>Last Sale</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {filteredCustomers.map((customer, index) => (
+                  <tr key={`${customer.name}-${customer.phone}-${index}`}>
+                    <td>{index + 1}</td>
+                    <td>
+                      <strong>{customer.name}</strong>
+                    </td>
+                    <td>{customer.phone || "-"}</td>
+                    <td>{customer.email || "-"}</td>
+                    <td>{customer.address || "-"}</td>
+                    <td>Rs {customer.totalAmount.toLocaleString()}</td>
+                    <td>{customer.totalQuantity.toLocaleString()}</td>
+                    <td>{Array.from(customer.invoices).join(", ") || "-"}</td>
+                    <td>{formatDate(customer.lastDate)}</td>
+                    <td>
+                      <button
+                        type="button"
+                        className="btn danger"
+                        onClick={() => deleteCustomer(customer)}
+                        disabled={deletingKey === customer.key}
+                      >
+                        {deletingKey === customer.key ? "Deleting..." : "Delete"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td></td>
+                  <td>
+                    <strong>Total</strong>
+                  </td>
+                  <td colSpan="3">{filteredCustomers.length} customers</td>
+                  <td>
+                    <strong>Rs {totals.totalAmount.toLocaleString()}</strong>
+                  </td>
+                  <td>
+                    <strong>{totals.totalQuantity.toLocaleString()}</strong>
+                  </td>
+                  <td>{totals.invoiceCount} invoices</td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tfoot>
+            </table>
           </div>
         )}
       </div>

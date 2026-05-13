@@ -45,6 +45,9 @@ export const createToken = (user) => {
     sub: String(user._id),
     email: String(user.email || "").trim().toLowerCase(),
     name: String(user.name || "").trim(),
+    legacyOwnerIds: Array.isArray(user.legacyOwnerIds)
+      ? user.legacyOwnerIds.map((ownerId) => String(ownerId || "").trim()).filter(Boolean)
+      : [],
     exp: Date.now() + TOKEN_TTL_MS,
   };
 
